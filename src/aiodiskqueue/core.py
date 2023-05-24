@@ -5,9 +5,8 @@ from pathlib import Path
 from typing import Any, Union
 
 import aiosqlite
-
-from aioqueues.exceptions import QueueEmpty
-from aioqueues.utils import NoPublicConstructor
+from aiodiskqueue.exceptions import QueueEmpty
+from aiodiskqueue.utils import NoPublicConstructor
 
 
 class PersistentQueue(metaclass=NoPublicConstructor):

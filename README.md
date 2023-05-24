@@ -1,4 +1,4 @@
-# aioqueues
+# aiodiskqueue
 
 A persistent asyncio queue.
 
@@ -16,7 +16,7 @@ Here is a basic example on how to use the queue
 
 ```python
 import asyncio
-from aioqueues import PersistentQueue
+from aiodiskqueue import PersistentQueue
 
 async def main():
     q = await PersistentQueue.create("example_queue.sqlite")

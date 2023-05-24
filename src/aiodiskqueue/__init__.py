@@ -1,7 +1,7 @@
 """A persistent asyncio queue"""
 
-from aioqueues.core import PersistentQueue
-from aioqueues.exceptions import QueueEmpty
+from aiodiskqueue.core import PersistentQueue
+from aiodiskqueue.exceptions import QueueEmpty
 
 __version__ = "0.1.0dev1"
 

@@ -1,6 +1,6 @@
 import asyncio
 
-from aioqueues import PersistentQueue
+from aiodiskqueue import PersistentQueue
 
 
 async def main():

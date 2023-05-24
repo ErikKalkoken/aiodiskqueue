@@ -10,7 +10,7 @@ import string
 import sys
 from pathlib import Path
 
-from aioqueues import PersistentQueue, QueueEmpty
+from aiodiskqueue import PersistentQueue, QueueEmpty
 
 
 def signal_handle(_signal, frame):

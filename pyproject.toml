@@ -3,7 +3,7 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "aioqueues"
+name = "aiodiskqueue"
 authors = [{name = "Erik Kalkoken", email = "kalkoken87@gmail.com"}]
 license = {file = "LICENSE"}
 readme = "README.md"
@@ -22,4 +22,4 @@ dependencies = [
 ]
 
 [tool.flit.module]
-name = "aioqueues"
+name = "aiodiskqueue"
