@@ -8,12 +8,16 @@ Persistent queues for Python AsyncIO.
 Description
 -----------
 
-This library for Python AsyncIO provides queues, which persist their content on disk. Their main advantage is that they their content will survive a normal process restart and potentially even a process crash.
+This library provides a persistent queue for Python AsyncIO.
+
+It's main advantage is that it's content will survive a normal process restart and potentially even a process crash.
+
+Each queue is stored in it's own SQLite database on disk to provide maximum isolation between queues. Using SQLite should also make the queue inherently process safe [needs confirmation].
 
 Usage
 -----
 
-Here is a basic example on how to use the queue
+Here is a basic example on how to use the queue:
 
 .. code:: python
 
@@ -27,6 +31,19 @@ Here is a basic example on how to use the queue
        print(item)
 
    asyncio.run(main())
+
+Please see the examples folder for more usage examples.
+
+Installation
+------------
+
+You can install directly from PyPI with the following command:
+
+.. code:: shell
+
+   pip install aiodiskqueue
+
+
 
 .. |release| image:: https://img.shields.io/pypi/v/aiodiskqueue?label=release
    :target: https://pypi.org/project/aiodiskqueue/

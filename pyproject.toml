@@ -8,6 +8,7 @@ authors = [{name = "Erik Kalkoken", email = "kalkoken87@gmail.com"}]
 license = {file = "LICENSE"}
 readme = "README.rst"
 classifiers = [
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.8",
@@ -18,8 +19,13 @@ classifiers = [
 dynamic = ["version", "description"]
 requires-python = ">=3.8"
 dependencies = [
-    "aiosqlite"
+    "aiosqlite>=0.19.0"
 ]
+
+[project.urls]
+Documentation = "https://aiodiskqueue.readthedocs.io/en/latest/"
+Source = "https://github.com/ErikKalkoken/aiodiskqueue"
+Tracker = "https://github.com/ErikKalkoken/aiodiskqueue/issues"
 
 [tool.flit.module]
 name = "aiodiskqueue"
