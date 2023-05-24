@@ -3,7 +3,7 @@ aiodiskqueue
 
 Persistent queues for Python AsyncIO.
 
-|release| |python| |tests| |codecov| |pre-commit| |Code style: black|
+|release| |python| |tests| |codecov| |docs| |pre-commit| |Code style: black|
 
 Description
 -----------
@@ -35,6 +35,8 @@ Here is a basic example on how to use the queue
 .. |tests| image:: https://github.com/ErikKalkoken/aiodiskqueue/actions/workflows/main.yml/badge.svg
 .. |codecov| image:: https://codecov.io/gh/ErikKalkoken/aiodiskqueue/branch/main/graph/badge.svg?token=V43h7hl1Te
    :target: https://codecov.io/gh/ErikKalkoken/aiodiskqueue
+.. |docs| image:: https://aiodiskqueue.readthedocs.io/en/latest/?badge=latest
+   :target: https://readthedocs.org/projects/aiodiskqueue/badge/?version=latest
 .. |pre-commit| image:: https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white
    :target: https://github.com/pre-commit/pre-commit
 .. |Code style: black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
