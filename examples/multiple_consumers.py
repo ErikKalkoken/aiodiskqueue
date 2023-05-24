@@ -28,13 +28,15 @@ async def consumer(queue: PersistentQueue):
 async def main():
     path = Path.cwd() / "example_queue.sqlite"
     queue = await PersistentQueue.create(path)
-    async with asyncio.TaskGroup() as tg:
-        tg.create_task(consumer(queue))
-        tg.create_task(consumer(queue))
-        tg.create_task(producer(queue, 1))
-        tg.create_task(producer(queue, 2))
-        tg.create_task(producer(queue, 3))
-        tg.create_task(producer(queue, 4))
+    coroutines = [
+        consumer(queue),
+        consumer(queue),
+        producer(queue, 1),
+        producer(queue, 2),
+        producer(queue, 3),
+        producer(queue, 4),
+    ]
+    await asyncio.gather(*coroutines)
 
 
 if __name__ == "__main__":
