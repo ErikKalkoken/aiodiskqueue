@@ -1,4 +1,4 @@
-"""Example: Multiple producers and a single consumer act in parallel, 
+"""Example: Multiple producers and a single consumer act in parallel,
 each run in their own process.
 """
 
