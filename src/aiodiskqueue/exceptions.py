@@ -1,9 +1,9 @@
 """Custom exceptions raised by this package."""
 
 
-class PersistentQueueException(Exception):
+class QueueException(Exception):
     """Top exception for exceptions raised by this package."""
 
 
-class QueueEmpty(PersistentQueueException):
+class QueueEmpty(QueueException):
     """The queue is empty."""

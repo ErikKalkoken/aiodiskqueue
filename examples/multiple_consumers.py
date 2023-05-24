@@ -5,17 +5,17 @@ import random
 import string
 from pathlib import Path
 
-from aiodiskqueue import PersistentQueue, QueueEmpty
+from aiodiskqueue import Queue, QueueEmpty
 
 
-async def producer(queue: PersistentQueue, num: int):
+async def producer(queue: Queue, num: int):
     for letter in string.ascii_uppercase:
         msg = f"producer {num}: {letter}"
         await queue.put(msg)
         await asyncio.sleep(random.random() / 10)
 
 
-async def consumer(queue: PersistentQueue):
+async def consumer(queue: Queue):
     while True:
         try:
             message = await queue.get()
@@ -27,7 +27,7 @@ async def consumer(queue: PersistentQueue):
 
 async def main():
     path = Path.cwd() / "example_queue.sqlite"
-    queue = await PersistentQueue.create(path)
+    queue = await Queue.create(path)
     coroutines = [
         consumer(queue),
         consumer(queue),

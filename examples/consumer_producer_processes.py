@@ -10,7 +10,7 @@ import string
 import sys
 from pathlib import Path
 
-from aiodiskqueue import PersistentQueue, QueueEmpty
+from aiodiskqueue import Queue, QueueEmpty
 
 
 def signal_handle(_signal, frame):
@@ -18,14 +18,14 @@ def signal_handle(_signal, frame):
     sys.exit()
 
 
-async def producer(queue: PersistentQueue, num: int):
+async def producer(queue: Queue, num: int):
     for letter in string.ascii_uppercase:
         msg = f"producer {num}: {letter}"
         await queue.put(msg)
         await asyncio.sleep(random.random() / 10)
 
 
-async def consumer(queue: PersistentQueue):
+async def consumer(queue: Queue):
     while True:
         try:
             message = await queue.get()
@@ -37,14 +37,14 @@ async def consumer(queue: PersistentQueue):
 
 async def run_consumer():
     path = Path.cwd() / "example_queue.sqlite"
-    queue = await PersistentQueue.create(path)
+    queue = await Queue.create(path)
     async with asyncio.TaskGroup() as tg:
         tg.create_task(consumer(queue))
 
 
 async def run_producer(num: int):
     path = Path.cwd() / "example_queue.sqlite"
-    queue = await PersistentQueue.create(path)
+    queue = await Queue.create(path)
     async with asyncio.TaskGroup() as tg:
         tg.create_task(producer(queue, num))
 

@@ -5,11 +5,12 @@ from pathlib import Path
 from typing import Any, Union
 
 import aiosqlite
+
 from aiodiskqueue.exceptions import QueueEmpty
 from aiodiskqueue.utils import NoPublicConstructor
 
 
-class PersistentQueue(metaclass=NoPublicConstructor):
+class Queue(metaclass=NoPublicConstructor):
     """A persistent asyncio queue.
 
     The queue has no upper limited and is constrained by available disk space only.
@@ -71,7 +72,7 @@ class PersistentQueue(metaclass=NoPublicConstructor):
             )
 
     @classmethod
-    async def create(cls, db_path: Union[str, Path]) -> "PersistentQueue":
+    async def create(cls, db_path: Union[str, Path]) -> "Queue":
         """Create a new queue.
 
         When a queue already exists at the given path it will be reused.
