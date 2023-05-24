@@ -6,7 +6,7 @@ build-backend = "flit_core.buildapi"
 name = "aiodiskqueue"
 authors = [{name = "Erik Kalkoken", email = "kalkoken87@gmail.com"}]
 license = {file = "LICENSE"}
-readme = "README.md"
+readme = "README.rst"
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",

@@ -23,4 +23,27 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "alabaster"
+html_theme_options = {
+    "description": "Persistent queues for Python AsyncIO",
+    "fixed_sidebar": True,
+    "badge_branch": "master",
+    "github_button": True,
+    "github_user": "ErikKalkoken",
+    "github_repo": "aiodiskqueue",
+    "show_powered_by": False,
+    "sidebar_collapse": False,
+    "extra_nav_links": {
+        "Report Issues": "https://github.com/ErikKalkoken/aiodiskqueue/issues",
+    },
+}
+
+html_sidebars = {
+    "**": [
+        "about.html",
+        "navigation.html",
+        "relations.html",
+        "searchbox.html",
+    ],
+}
+
 html_static_path = ["_static"]

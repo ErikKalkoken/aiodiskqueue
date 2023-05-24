@@ -15,7 +15,7 @@ class Queue(metaclass=NoPublicConstructor):
 
     The queue has no upper limited and is constrained by available disk space only.
 
-    Create a new queue with the `create()` factory method.
+    Create a new queue with the :func:`Queue.create` factory method.
     """
 
     def __init__(self, _db_path: Path) -> None:
@@ -38,13 +38,13 @@ class Queue(metaclass=NoPublicConstructor):
         """Return True if the queue is empty, False otherwise.
 
         If empty() returns False it doesn’t guarantee
-        that a subsequent call to get() will not raise QueueEmpty.
+        that a subsequent call to get() will not raise :class:`.QueueEmpty`.
         """
         return await self.qsize() == 0
 
     async def get(self) -> Any:
         """Remove and return an item from the queue.
-        If queue is empty, raise QueueEmpty.
+        If queue is empty, raise :class:`.QueueEmpty`.
         """
         async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
             db.row_factory = aiosqlite.Row

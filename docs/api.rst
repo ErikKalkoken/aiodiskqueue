@@ -1,7 +1,7 @@
 .. currentmodule:: aiodiskqueue
 
 ===============
-API
+API Reference
 ===============
 
 Queue
