@@ -11,3 +11,6 @@ dynamic = ["version", "description"]
 dependencies = [
     "aiosqlite"
 ]
+
+[tool.flit.module]
+name = "aioqueues"

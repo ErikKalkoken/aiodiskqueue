@@ -1,13 +1,17 @@
 import asyncio
 import pickle
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 import aiosqlite
 
 
-class QueueEmpty(Exception):
-    pass
+class PersistentQueueException(Exception):
+    """Top exception for exceptions raised by this package."""
+
+
+class QueueEmpty(PersistentQueueException):
+    """The queue is empty."""
 
 
 class PersistentQueue:
@@ -20,14 +24,13 @@ class PersistentQueue:
         """Return the approximate size of the queue.
         Note, qsize() > 0 doesn’t guarantee that a subsequent get() will not block.
         """
-        async with aiosqlite.connect(self.db_path) as db:
-            async with db.execute(
+        async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
+            rows: list = await db.execute_fetchall(
                 """
                 SELECT count(*) FROM queue;
                 """
-            ) as cursor:
-                row: list = await cursor.fetchone()  # type: ignore
-        return int(row[0])
+            )  # type: ignore
+        return int(rows[0][0])
 
     async def empty(self) -> bool:
         """Return True if the queue is empty, False otherwise.
@@ -35,13 +38,13 @@ class PersistentQueue:
         If empty() returns False it doesn’t guarantee
         that a subsequent call to get() will not block.
         """
-        return self.qsize() == 0
+        return await self.qsize() == 0
 
     async def get(self) -> Any:
         """Remove and return an item from the queue.
-        If queue is empty, raised QueueEmpty.
+        If queue is empty, raise QueueEmpty.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
             db.row_factory = aiosqlite.Row
             rows: list = await db.execute_fetchall(
                 """
@@ -51,7 +54,6 @@ class PersistentQueue:
                 LIMIT 1;
                 """
             )  # type: ignore
-            await db.commit()
             if rows:
                 return pickle.loads(rows[0]["item"])
             raise QueueEmpty()
@@ -59,41 +61,22 @@ class PersistentQueue:
     async def put(self, item: Any) -> None:
         """Put an item into the queue."""
         data = pickle.dumps(item)
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
             await db.execute(
                 """
-                INSERT INTO queue (item) VALUES (?)
+                INSERT INTO queue (item) VALUES (?);
                 """,
                 (data,),
             )
-            await db.commit()
 
     @classmethod
-    async def create(cls, db_path: Path) -> "PersistentQueue":
-        async with aiosqlite.connect(db_path) as db:
+    async def create(cls, db_path: Union[str, Path]) -> "PersistentQueue":
+        """Create new queue."""
+        db_path = Path(db_path)
+        async with aiosqlite.connect(db_path, isolation_level=None) as db:
             await db.execute(
                 """
-                CREATE TABLE IF NOT EXISTS queue (item BLOB)
+                CREATE TABLE IF NOT EXISTS queue (item BLOB);
                 """
             )
-            await db.commit()
         return cls(db_path)
-
-
-async def main():
-    path = Path.cwd() / "queue.sqlite"
-    q = await PersistentQueue.create(path)
-    await q.put("test 1")
-    await q.put("test 2")
-    await q.put("test 3")
-    print(await q.qsize())
-    while True:
-        item = await q.get()
-        print(item)
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
