@@ -1,3 +1,5 @@
+"""Example 1: Multiple producers and one consumer act in parallel."""
+
 import asyncio
 import random
 import string
@@ -6,13 +8,9 @@ from pathlib import Path
 from aioqueues.queues import PersistentQueue, QueueEmpty
 
 
-def random_string(length: int) -> str:
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
-
-
 async def producer(queue: PersistentQueue, num: int):
-    for _ in range(10):
-        msg = f"producer {num}: {random_string(10)}"
+    for letter in string.ascii_uppercase:
+        msg = f"producer {num}: {letter}"
         await queue.put(msg)
         await asyncio.sleep(random.random())
 
@@ -22,13 +20,13 @@ async def consumer(queue: PersistentQueue):
         try:
             message = await queue.get()
         except QueueEmpty:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.05)
         else:
             print(message)
 
 
 async def main():
-    path = Path.cwd() / "queue.sqlite"
+    path = Path.cwd() / "example_queue.sqlite"
     queue = await PersistentQueue.create(path)
     async with asyncio.TaskGroup() as tg:
         tg.create_task(consumer(queue))
