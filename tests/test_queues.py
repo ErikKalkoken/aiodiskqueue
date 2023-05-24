@@ -4,7 +4,8 @@ import tempfile
 from pathlib import Path
 from unittest import IsolatedAsyncioTestCase
 
-from aioqueues.queues import PersistentQueue, QueueEmpty
+from aioqueues.exceptions import QueueEmpty
+from aioqueues.queues import PersistentQueue
 
 
 class TestPersistentQueue(IsolatedAsyncioTestCase):
@@ -14,6 +15,11 @@ class TestPersistentQueue(IsolatedAsyncioTestCase):
 
     def tearDown(self) -> None:
         shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_should_not_permit_direct_instantiation(self):
+        # when/then
+        with self.assertRaises(TypeError):
+            PersistentQueue(self.db_path)
 
     async def test_should_create_queue_and_measure_size(self):
         # given

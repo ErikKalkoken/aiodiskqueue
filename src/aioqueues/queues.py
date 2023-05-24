@@ -4,17 +4,15 @@ from typing import Any, Union
 
 import aiosqlite
 
-
-class PersistentQueueException(Exception):
-    """Top exception for exceptions raised by this package."""
-
-
-class QueueEmpty(PersistentQueueException):
-    """The queue is empty."""
+from aioqueues.exceptions import QueueEmpty
+from aioqueues.utils import NoPublicConstructor
 
 
-class PersistentQueue:
-    """A persistent & unlimited asyncio queue."""
+class PersistentQueue(metaclass=NoPublicConstructor):
+    """A persistent & unlimited asyncio queue.
+
+    Create a new queue with the `create()` factory method.
+    """
 
     def __init__(self, _db_path: Path) -> None:
         self.db_path = _db_path
@@ -82,4 +80,4 @@ class PersistentQueue:
                 CREATE TABLE IF NOT EXISTS queue (item BLOB);
                 """
             )
-        return cls(db_path)
+        return cls._create(db_path)
