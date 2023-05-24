@@ -29,3 +29,6 @@ Tracker = "https://github.com/ErikKalkoken/aiodiskqueue/issues"
 
 [tool.flit.module]
 name = "aiodiskqueue"
+
+[tool.isort]
+profile = "black"

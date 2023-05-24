@@ -4,7 +4,7 @@ from aiodiskqueue import Queue
 
 
 async def main():
-    q = await Queue.create("example_queue.sqlite")
+    q = Queue("example_queue.sqlite")
     await q.put("some item")
     item = await q.get()
     print(item)

@@ -37,14 +37,14 @@ async def consumer(queue: Queue):
 
 async def run_consumer():
     path = Path.cwd() / "example_queue.sqlite"
-    queue = await Queue.create(path)
+    queue = Queue(path)
     async with asyncio.TaskGroup() as tg:
         tg.create_task(consumer(queue))
 
 
 async def run_producer(num: int):
     path = Path.cwd() / "example_queue.sqlite"
-    queue = await Queue.create(path)
+    queue = Queue(path)
     async with asyncio.TaskGroup() as tg:
         tg.create_task(producer(queue, num))
 

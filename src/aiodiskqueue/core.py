@@ -1,30 +1,47 @@
-"""Core implementation of a persistent asyncio queue."""
+"""Core implementation of a persistent AsyncIO queue."""
 
 import pickle
+import sqlite3
 from pathlib import Path
 from typing import Any, Union
 
 import aiosqlite
 
 from aiodiskqueue.exceptions import QueueEmpty
-from aiodiskqueue.utils import NoPublicConstructor
 
 
-class Queue(metaclass=NoPublicConstructor):
-    """A persistent asyncio queue.
+class Queue:
+    """A persistent AsyncIO queue.
 
     The queue has no upper limited and is constrained by available disk space only.
-
-    Create a new queue with the :func:`Queue.create` factory method.
     """
 
-    def __init__(self, _db_path: Path) -> None:
-        self.db_path = _db_path
+    def __init__(self, db_path: Union[str, Path]) -> None:
+        """Create a new queue object.
+
+        A new queue DB will be created for this queue if it does not exist.
+
+        If the queue DB does exist it will be reused
+        and it's content will be preserved.
+
+        Args:
+            db_path: Path of the SQLite DB to be created / used. e.g. `queue.sqlite`
+
+        Returns:
+            newly created queue object
+        """
+        self.db_path = Path(db_path)
+        with sqlite3.connect(self.db_path, isolation_level=None) as db:
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS queue (item BLOB);
+                """
+            )
 
     async def qsize(self) -> int:
         """Return the approximate size of the queue.
         Note, qsize() > 0 doesn’t guarantee that a subsequent get()
-        will not raise QueueEmpty.
+        will not raise :class:`.QueueEmpty`.
         """
         async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
             rows: list = await db.execute_fetchall(
@@ -61,7 +78,11 @@ class Queue(metaclass=NoPublicConstructor):
         raise QueueEmpty()
 
     async def put(self, item: Any) -> None:
-        """Put an item into the queue. Any item that can be pickled is allowed."""
+        """Put an item into the queue.
+
+        Args:
+            item: Any Python object that can be pickled
+        """
         data = pickle.dumps(item)
         async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
             await db.execute(
@@ -70,18 +91,3 @@ class Queue(metaclass=NoPublicConstructor):
                 """,
                 (data,),
             )
-
-    @classmethod
-    async def create(cls, db_path: Union[str, Path]) -> "Queue":
-        """Create a new queue.
-
-        When a queue already exists at the given path it will be reused.
-        """
-        db_path = Path(db_path)
-        async with aiosqlite.connect(db_path, isolation_level=None) as db:
-            await db.execute(
-                """
-                CREATE TABLE IF NOT EXISTS queue (item BLOB);
-                """
-            )
-        return cls._create(db_path)
