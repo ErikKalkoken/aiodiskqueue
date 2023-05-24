@@ -1,4 +1,4 @@
-"""Persistent Asyncio Queue"""
+"""A persistent asyncio queue"""
 
 from aioqueues.core import PersistentQueue
 from aioqueues.exceptions import QueueEmpty

@@ -1,4 +1,4 @@
-"""Example 1: Multiple producers and multiple consumers act in parallel."""
+"""Example: Multiple producers and a single consumer act in parallel."""
 
 import asyncio
 import random
@@ -12,7 +12,7 @@ async def producer(queue: PersistentQueue, num: int):
     for letter in string.ascii_uppercase:
         msg = f"producer {num}: {letter}"
         await queue.put(msg)
-        await asyncio.sleep(random.random())
+        await asyncio.sleep(random.random() / 10)
 
 
 async def consumer(queue: PersistentQueue):
@@ -30,11 +30,9 @@ async def main():
     queue = await PersistentQueue.create(path)
     async with asyncio.TaskGroup() as tg:
         tg.create_task(consumer(queue))
-        tg.create_task(consumer(queue))
         tg.create_task(producer(queue, 1))
         tg.create_task(producer(queue, 2))
         tg.create_task(producer(queue, 3))
-        tg.create_task(producer(queue, 4))
 
 
 if __name__ == "__main__":
