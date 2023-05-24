@@ -1,3 +1,5 @@
+"""Core implementation of a persistent asyncio queue."""
+
 import pickle
 from pathlib import Path
 from typing import Any, Union
@@ -9,7 +11,9 @@ from aioqueues.utils import NoPublicConstructor
 
 
 class PersistentQueue(metaclass=NoPublicConstructor):
-    """A persistent & unlimited asyncio queue.
+    """A persistent asyncio queue.
+
+    The queue has no upper limited and is constrained by available disk space only.
 
     Create a new queue with the `create()` factory method.
     """

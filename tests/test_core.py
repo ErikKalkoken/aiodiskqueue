@@ -4,8 +4,7 @@ import tempfile
 from pathlib import Path
 from unittest import IsolatedAsyncioTestCase
 
-from aioqueues.exceptions import QueueEmpty
-from aioqueues.queues import PersistentQueue
+from aioqueues import PersistentQueue, QueueEmpty
 
 
 class TestPersistentQueue(IsolatedAsyncioTestCase):

@@ -1,3 +1,5 @@
+"""Utility classes and functions."""
+
 from typing import Any, Type, TypeVar
 
 T = TypeVar("T")

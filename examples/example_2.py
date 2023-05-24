@@ -5,7 +5,7 @@ import random
 import string
 from pathlib import Path
 
-from aioqueues.queues import PersistentQueue, QueueEmpty
+from aioqueues import PersistentQueue, QueueEmpty
 
 
 async def producer(queue: PersistentQueue, num: int):
