@@ -88,5 +88,5 @@ class TestQueue(IsolatedAsyncioTestCase):
         await asyncio.sleep(1)  # consumer sees an empty queue when task starts
         await q.put("special-item")
         # then
-        item = await queue_2.get_nowait()
+        item = await queue_2.get()
         self.assertEqual(item, "special-item")
