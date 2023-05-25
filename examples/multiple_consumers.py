@@ -5,7 +5,7 @@ import random
 import string
 from pathlib import Path
 
-from aiodiskqueue import Queue, QueueEmpty
+from aiodiskqueue import Queue
 
 
 async def producer(queue: Queue, num: int):
@@ -17,12 +17,8 @@ async def producer(queue: Queue, num: int):
 
 async def consumer(queue: Queue):
     while True:
-        try:
-            message = await queue.get()
-        except QueueEmpty:
-            await asyncio.sleep(0.05)
-        else:
-            print(message)
+        message = await queue.get()
+        print(message)
 
 
 async def main():

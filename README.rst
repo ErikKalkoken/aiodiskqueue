@@ -12,7 +12,7 @@ This library provides a persistent queue for Python AsyncIO.
 
 It's main advantage is that it's content will survive a normal process restart and potentially even a process crash.
 
-Each queue is stored in it's own SQLite database on disk to provide maximum isolation between queues. Using SQLite should also make the queue inherently process safe [needs confirmation].
+Each queue is stored in it's own SQLite database on disk to provide maximum isolation between queues.
 
 Usage
 -----

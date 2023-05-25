@@ -1,5 +1,6 @@
 """Core implementation of a persistent AsyncIO queue."""
 
+import asyncio
 import pickle
 from pathlib import Path
 from typing import Any, Union
@@ -15,6 +16,8 @@ class Queue:
     The queue has no upper limited and is constrained by available disk space only.
 
     Create a new object with the factory method :func:`create`.
+
+    This class is not thread safe.
     """
 
     def __init__(self, db_path: Union[str, Path]) -> None:
@@ -25,6 +28,7 @@ class Queue:
             db_path: Path of an existing queue DB
         """
         self.db_path = Path(db_path)
+        self.has_new_item = asyncio.Condition()
 
     async def qsize(self) -> int:
         """Return the approximate size of the queue.
@@ -49,20 +53,41 @@ class Queue:
 
     async def get(self) -> Any:
         """Remove and return an item from the queue.
-        If queue is empty, raise :class:`.QueueEmpty`.
+        If queue is empty, wait until an item is available.
+        """
+
+        async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
+            while True:
+                try:
+                    return await self._fetch_item(db)
+                except QueueEmpty:
+                    pass
+                async with self.has_new_item:
+                    await self.has_new_item.wait()
+
+    async def get_nowait(self) -> Any:
+        """Remove and return an item if one is immediately available,
+        else raise :class:`.QueueEmpty`.
         """
         async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
-            db.row_factory = aiosqlite.Row
-            rows: list = await db.execute_fetchall(
-                """
+            return await self._fetch_item(db)
+
+    async def _fetch_item(self, db: aiosqlite.Connection) -> Any:
+        """Make the DB call to remote and return an item
+        if one is immediately available else raise `QueueEmpty`.
+        """
+        db.row_factory = aiosqlite.Row
+        rows: list = await db.execute_fetchall(
+            """
                 DELETE FROM queue
                 RETURNING *
                 ORDER BY rowid
                 LIMIT 1;
                 """
-            )  # type: ignore
+        )  # type: ignore
         if rows:
-            return pickle.loads(rows[0]["item"])
+            item = pickle.loads(rows[0]["item"])
+            return item
         raise QueueEmpty()
 
     async def put(self, item: Any) -> None:
@@ -79,6 +104,8 @@ class Queue:
                 """,
                 (data,),
             )
+        async with self.has_new_item:
+            self.has_new_item.notify()
 
     @classmethod
     async def create(cls, db_path: Union[str, Path]) -> "Queue":

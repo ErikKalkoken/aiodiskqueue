@@ -1,3 +1,4 @@
+import asyncio
 import datetime as dt
 import shutil
 import tempfile
@@ -37,7 +38,7 @@ class TestQueue(IsolatedAsyncioTestCase):
         q = await Queue.create(self.db_path)
         await q.put("dummy")
         # when
-        result = await q.get()
+        result = await q.get_nowait()
         # then
         self.assertEqual(result, "dummy")
 
@@ -50,7 +51,7 @@ class TestQueue(IsolatedAsyncioTestCase):
         }
         await q.put(item)
         # when
-        result = await q.get()
+        result = await q.get_nowait()
         # then
         self.assertEqual(result, item)
 
@@ -59,7 +60,7 @@ class TestQueue(IsolatedAsyncioTestCase):
         q = await Queue.create(self.db_path)
         # when/then
         with self.assertRaises(QueueEmpty):
-            await q.get()
+            await q.get_nowait()
 
     async def test_should_report_as_empty(self):
         # given
@@ -73,3 +74,19 @@ class TestQueue(IsolatedAsyncioTestCase):
         await q.put("dummy")
         # when/then
         self.assertFalse(await q.empty())
+
+    async def test_get_should_wait_until_item_is_available(self):
+        async def consumer():
+            item = await q.get()
+            await queue_2.put(item)
+
+        # given
+        queue_2 = asyncio.Queue()
+        q = await Queue.create(self.db_path)
+        asyncio.create_task(consumer())
+        # when
+        await asyncio.sleep(1)  # consumer sees an empty queue when task starts
+        await q.put("special-item")
+        # then
+        item = await queue_2.get_nowait()
+        self.assertEqual(item, "special-item")
