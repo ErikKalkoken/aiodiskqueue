@@ -17,7 +17,7 @@ class TestQueue(IsolatedAsyncioTestCase):
 
     async def test_should_create_queue_and_measure_size(self):
         # given
-        q = Queue(self.db_path)
+        q = await Queue.create(self.db_path)
         # when
         result = await q.qsize()
         # then
@@ -25,7 +25,7 @@ class TestQueue(IsolatedAsyncioTestCase):
 
     async def test_should_put_items_and_measure_size(self):
         # given
-        q = Queue(self.db_path)
+        q = await Queue.create(self.db_path)
         # when
         await q.put("dummy")
         # then
@@ -34,7 +34,7 @@ class TestQueue(IsolatedAsyncioTestCase):
 
     async def test_should_get_items(self):
         # given
-        q = Queue(self.db_path)
+        q = await Queue.create(self.db_path)
         await q.put("dummy")
         # when
         result = await q.get()
@@ -43,7 +43,7 @@ class TestQueue(IsolatedAsyncioTestCase):
 
     async def test_should_handle_complex_items(self):
         # given
-        q = Queue(self.db_path)
+        q = await Queue.create(self.db_path)
         item = {
             "alpha": ["one", "two", "three"],
             "now": dt.datetime.now(tz=dt.timezone.utc),
@@ -56,20 +56,20 @@ class TestQueue(IsolatedAsyncioTestCase):
 
     async def test_should_raise_exception_when_get_on_empty_queue(self):
         # given
-        q = Queue(self.db_path)
+        q = await Queue.create(self.db_path)
         # when/then
         with self.assertRaises(QueueEmpty):
             await q.get()
 
     async def test_should_report_as_empty(self):
         # given
-        q = Queue(self.db_path)
+        q = await Queue.create(self.db_path)
         # when/then
         self.assertTrue(await q.empty())
 
     async def test_should_not_report_as_empty(self):
         # given
-        q = Queue(self.db_path)
+        q = await Queue.create(self.db_path)
         await q.put("dummy")
         # when/then
         self.assertFalse(await q.empty())

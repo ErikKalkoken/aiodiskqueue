@@ -27,7 +27,7 @@ async def consumer(queue: Queue):
 
 async def main():
     path = Path.cwd() / "example_queue.sqlite"
-    queue = Queue(path)
+    queue = await Queue.create(path)
     coroutines = [
         consumer(queue),
         producer(queue, 1),

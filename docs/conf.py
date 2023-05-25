@@ -24,7 +24,7 @@ autodoc_default_options = {
     "members": True,
     "member-order": "alphabetical",
     "special-members": "__init__",
-    "undoc-members": True,
+    "undoc-members": False,
     "exclude-members": "__weakref__",
 }
 
