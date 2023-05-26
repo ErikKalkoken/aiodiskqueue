@@ -46,7 +46,7 @@ async def main(db_path):
     queue_1 = asyncio.Queue()
     for item in items:
         queue_1.put_nowait(item)
-    queue_2 = await aiodiskqueue.Queue.create(db_path)
+    queue_2 = await aiodiskqueue.Queue(db_path)
     queue_3 = asyncio.Queue()
     start = time.perf_counter()
     consumer_task_1 = asyncio.create_task(consumer(queue_2, queue_3))

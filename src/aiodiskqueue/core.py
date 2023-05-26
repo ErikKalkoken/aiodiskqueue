@@ -1,6 +1,6 @@
 """Core implementation of a persistent AsyncIO queue."""
-
 import asyncio
+import logging
 import pickle
 from pathlib import Path
 from typing import Any, Union
@@ -9,24 +9,27 @@ import aiofiles
 
 from aiodiskqueue.exceptions import QueueEmpty
 
+logger = logging.getLogger(__name__)
+
 
 class Queue:
     """A persistent AsyncIO FIFO queue.
 
     The queue has no upper limited and is constrained by available disk space only.
 
-    Create a new object with the factory method :func:`create`.
+    A new data file will be created for every new queue object if it does not exist.
+    If a data file already exists it will be reused
+    and it's content will be preserved if possible. Corrupted files will be re-created.
 
     This class is not thread safe.
+
+    Using two different instances with the same data file is not recommended as it may lead to data corruption.
+
+    Args:
+        data_path: Path of the data file for this queue. e.g. `queue.dat`
     """
 
     def __init__(self, data_path: Union[str, Path]) -> None:
-        """Note that when calling this method it is assumed
-        that the queue DB already exists at the given path.
-
-        Args:
-            data_path: Path of an existing data file
-        """
         self.data_path = Path(data_path)
         self.lock = asyncio.Lock()
         self.has_new_item = asyncio.Condition()
@@ -93,25 +96,12 @@ class Queue:
                 return pickle.loads(data)
         except FileNotFoundError:
             return []
+        except pickle.PickleError:
+            logger.exception(
+                "Data file is corrupt. Will be re-created: %s", self.data_path
+            )
+            return []
 
     async def _write_queue(self, queue):
         async with aiofiles.open(self.data_path, "wb") as fp:
             await fp.write(pickle.dumps(queue))
-
-    @classmethod
-    async def create(cls, data_path: Union[str, Path]) -> "Queue":
-        """Create a new queue object.
-
-        A new queue DB will be created for this queue if it does not exist.
-
-        If the queue DB does exist it will be reused
-        and it's content will be preserved.
-
-        Args:
-            data_path: Path of the SQLite DB to be created / used. e.g. `queue.sqlite`
-
-        Returns:
-            newly created queue object
-        """
-        data_path = Path(data_path)
-        return cls(data_path)

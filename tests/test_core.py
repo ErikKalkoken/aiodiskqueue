@@ -1,24 +1,27 @@
 import asyncio
-import datetime as dt
 import shutil
 import tempfile
 from pathlib import Path
 from unittest import IsolatedAsyncioTestCase
 
+import aiofiles
+
 from aiodiskqueue import Queue, QueueEmpty
+
+from .factories import ItemFactory
 
 
 class TestQueue(IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.temp_dir = Path(tempfile.mkdtemp())
-        self.db_path = self.temp_dir / "test_queue.bin"
+        self.db_path = self.temp_dir / "queue.dat"
 
     def tearDown(self) -> None:
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     async def test_should_create_queue_and_measure_size(self):
         # given
-        q = await Queue.create(self.db_path)
+        q = Queue(self.db_path)
         # when
         result = await q.qsize()
         # then
@@ -26,32 +29,20 @@ class TestQueue(IsolatedAsyncioTestCase):
 
     async def test_should_put_items_and_measure_size(self):
         # given
-        q = await Queue.create(self.db_path)
+        q = Queue(self.db_path)
         # when
-        await q.put("dummy")
-        await q.put("dummy")
+        await q.put(ItemFactory())
+        await q.put(ItemFactory())
         # then
         result = await q.qsize()
         self.assertEqual(result, 2)
 
     async def test_should_get_item(self):
         # given
-        q = await Queue.create(self.db_path)
-        await q.put("dummy-1")
-        await q.put("dummy-2")
-        # when
-        result = await q.get_nowait()
-        # then
-        self.assertEqual(result, "dummy-1")
-
-    async def test_should_handle_complex_items(self):
-        # given
-        q = await Queue.create(self.db_path)
-        item = {
-            "alpha": ["one", "two", "three"],
-            "now": dt.datetime.now(tz=dt.timezone.utc),
-        }
+        q = Queue(self.db_path)
+        item = ItemFactory()
         await q.put(item)
+        await q.put(ItemFactory())
         # when
         result = await q.get_nowait()
         # then
@@ -59,21 +50,21 @@ class TestQueue(IsolatedAsyncioTestCase):
 
     async def test_should_raise_exception_when_get_on_empty_queue(self):
         # given
-        q = await Queue.create(self.db_path)
+        q = Queue(self.db_path)
         # when/then
         with self.assertRaises(QueueEmpty):
             await q.get_nowait()
 
     async def test_should_report_as_empty(self):
         # given
-        q = await Queue.create(self.db_path)
+        q = Queue(self.db_path)
         # when/then
         self.assertTrue(await q.empty())
 
     async def test_should_not_report_as_empty(self):
         # given
-        q = await Queue.create(self.db_path)
-        await q.put("dummy")
+        q = Queue(self.db_path)
+        await q.put(ItemFactory())
         # when/then
         self.assertFalse(await q.empty())
 
@@ -84,11 +75,34 @@ class TestQueue(IsolatedAsyncioTestCase):
 
         # given
         queue_2 = asyncio.Queue()
-        q = await Queue.create(self.db_path)
+        q = Queue(self.db_path)
         asyncio.create_task(consumer())
         # when
         await asyncio.sleep(1)  # consumer sees an empty queue when task starts
-        await q.put("special-item")
+        item = ItemFactory()
+        await q.put(item)
         # then
-        item = await queue_2.get()
-        self.assertEqual(item, "special-item")
+        item_new = await queue_2.get()
+        self.assertEqual(item_new, item)
+
+    async def test_should_create_new_file_when_current_file_is_corrupt(self):
+        # given
+        async with aiofiles.open(self.db_path, "wb") as fp:
+            await fp.write(b"invalid-data")
+        q = Queue(self.db_path)
+        # when
+        result = await q.qsize()
+        # then
+        self.assertEqual(result, 0)
+
+    async def test_should_preserve_queue_content(self):
+        # given
+        queue_1 = Queue(self.db_path)
+        item = ItemFactory()
+        await queue_1.put(item)
+        # when
+        del queue_1
+        queue_2 = Queue(self.db_path)
+        item_new = await queue_2.get()
+        # then
+        self.assertEqual(item_new, item)
