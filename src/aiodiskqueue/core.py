@@ -30,16 +30,16 @@ class Queue:
     """
 
     def __init__(self, data_path: Union[str, Path]) -> None:
-        self.data_path = Path(data_path)
-        self.lock = asyncio.Lock()
-        self.has_new_item = asyncio.Condition()
+        self._data_path = Path(data_path)
+        self._lock = asyncio.Lock()
+        self._has_new_item = asyncio.Condition()
 
     async def qsize(self) -> int:
         """Return the approximate size of the queue.
         Note, qsize() > 0 doesn’t guarantee that a subsequent get()
         will not raise :class:`.QueueEmpty`.
         """
-        async with self.lock:
+        async with self._lock:
             queue = await self._read_queue()
             return len(queue)
 
@@ -60,14 +60,14 @@ class Queue:
                 return await self.get_nowait()
             except QueueEmpty:
                 pass
-            async with self.has_new_item:
-                await self.has_new_item.wait()
+            async with self._has_new_item:
+                await self._has_new_item.wait()
 
     async def get_nowait(self) -> Any:
         """Remove and return an item if one is immediately available,
         else raise :class:`.QueueEmpty`.
         """
-        async with self.lock:
+        async with self._lock:
             queue = await self._read_queue()
             if queue:
                 item = queue.pop(0)
@@ -81,30 +81,32 @@ class Queue:
         Args:
             item: Any Python object that can be pickled
         """
-        async with self.lock:
+        async with self._lock:
             queue = await self._read_queue()
             queue.append(item)
             await self._write_queue(queue)
 
-        async with self.has_new_item:
-            self.has_new_item.notify()
+        async with self._has_new_item:
+            self._has_new_item.notify()
 
     async def _read_queue(self) -> list:
         try:
-            async with aiofiles.open(self.data_path, "rb") as fp:
+            async with aiofiles.open(self._data_path, "rb") as fp:
                 data = await fp.read()
                 queue = pickle.loads(data)
-                logger.debug("Read queue with %d items: %s", len(queue), self.data_path)
+                logger.debug(
+                    "Read queue with %d items: %s", len(queue), self._data_path
+                )
                 return queue
         except FileNotFoundError:
             return []
         except pickle.PickleError:
             logger.exception(
-                "Data file is corrupt. Will be re-created: %s", self.data_path
+                "Data file is corrupt. Will be re-created: %s", self._data_path
             )
             return []
 
     async def _write_queue(self, queue):
-        async with aiofiles.open(self.data_path, "wb") as fp:
+        async with aiofiles.open(self._data_path, "wb") as fp:
             await fp.write(pickle.dumps(queue))
-        logger.debug("Wrote queue with %d items: %s", len(queue), self.data_path)
+        logger.debug("Wrote queue with %d items: %s", len(queue), self._data_path)
