@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class Queue:
     """A persistent AsyncIO FIFO queue.
 
-    The queue has no upper limited and is constrained by available disk space only.
+    The queue has no upper limit and is constrained by available disk space only.
 
     A new data file will be created for every new queue object if it does not exist.
     If a data file already exists it will be reused
@@ -33,6 +33,7 @@ class Queue:
         self._data_path = Path(data_path)
         self._lock = asyncio.Lock()
         self._has_new_item = asyncio.Condition()
+        self._peak_size = 0  # measuring peak size of the queue
 
     async def qsize(self) -> int:
         """Return the approximate size of the queue.
@@ -94,9 +95,9 @@ class Queue:
             async with aiofiles.open(self._data_path, "rb") as fp:
                 data = await fp.read()
                 queue = pickle.loads(data)
-                logger.debug(
-                    "Read queue with %d items: %s", len(queue), self._data_path
-                )
+                size = len(queue)
+                logger.debug("Read queue with %d items: %s", size, self._data_path)
+                self._peak_size = max(size, self._peak_size)
                 return queue
         except FileNotFoundError:
             return []

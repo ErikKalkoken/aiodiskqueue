@@ -32,7 +32,7 @@ autodoc_default_options = {
 
 html_theme = "alabaster"
 html_theme_options = {
-    "description": "Persistent queues for Python AsyncIO",
+    "description": "Persistent queue for Python AsyncIO",
     "fixed_sidebar": True,
     "badge_branch": "master",
     "github_button": True,

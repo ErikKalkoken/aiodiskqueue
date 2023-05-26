@@ -1,4 +1,4 @@
-"""Persistent queues for Python AsyncIO."""
+"""Persistent queue for Python AsyncIO."""
 
 from aiodiskqueue.core import Queue
 from aiodiskqueue.exceptions import QueueEmpty
