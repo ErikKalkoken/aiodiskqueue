@@ -93,7 +93,9 @@ class Queue:
         try:
             async with aiofiles.open(self.data_path, "rb") as fp:
                 data = await fp.read()
-                return pickle.loads(data)
+                queue = pickle.loads(data)
+                logger.debug("Read queue with %d items: %s", len(queue), self.data_path)
+                return queue
         except FileNotFoundError:
             return []
         except pickle.PickleError:
@@ -105,3 +107,4 @@ class Queue:
     async def _write_queue(self, queue):
         async with aiofiles.open(self.data_path, "wb") as fp:
             await fp.write(pickle.dumps(queue))
+        logger.debug("Wrote queue with %d items: %s", len(queue), self.data_path)
