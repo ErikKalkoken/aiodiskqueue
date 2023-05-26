@@ -11,7 +11,7 @@ from aiodiskqueue import Queue, QueueEmpty
 class TestQueue(IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.temp_dir = Path(tempfile.mkdtemp())
-        self.db_path = self.temp_dir / "test_queue.sqlite"
+        self.db_path = self.temp_dir / "test_queue.bin"
 
     def tearDown(self) -> None:
         shutil.rmtree(self.temp_dir, ignore_errors=True)
@@ -29,18 +29,20 @@ class TestQueue(IsolatedAsyncioTestCase):
         q = await Queue.create(self.db_path)
         # when
         await q.put("dummy")
+        await q.put("dummy")
         # then
         result = await q.qsize()
-        self.assertEqual(result, 1)
+        self.assertEqual(result, 2)
 
-    async def test_should_get_items(self):
+    async def test_should_get_item(self):
         # given
         q = await Queue.create(self.db_path)
-        await q.put("dummy")
+        await q.put("dummy-1")
+        await q.put("dummy-2")
         # when
         result = await q.get_nowait()
         # then
-        self.assertEqual(result, "dummy")
+        self.assertEqual(result, "dummy-1")
 
     async def test_should_handle_complex_items(self):
         # given

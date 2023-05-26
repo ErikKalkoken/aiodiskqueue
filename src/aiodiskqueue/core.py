@@ -5,13 +5,13 @@ import pickle
 from pathlib import Path
 from typing import Any, Union
 
-import aiosqlite
+import aiofiles
 
 from aiodiskqueue.exceptions import QueueEmpty
 
 
 class Queue:
-    """A persistent AsyncIO queue.
+    """A persistent AsyncIO FIFO queue.
 
     The queue has no upper limited and is constrained by available disk space only.
 
@@ -20,14 +20,15 @@ class Queue:
     This class is not thread safe.
     """
 
-    def __init__(self, db_path: Union[str, Path]) -> None:
+    def __init__(self, data_path: Union[str, Path]) -> None:
         """Note that when calling this method it is assumed
         that the queue DB already exists at the given path.
 
         Args:
-            db_path: Path of an existing queue DB
+            data_path: Path of an existing data file
         """
-        self.db_path = Path(db_path)
+        self.data_path = Path(data_path)
+        self.lock = asyncio.Lock()
         self.has_new_item = asyncio.Condition()
 
     async def qsize(self) -> int:
@@ -35,13 +36,9 @@ class Queue:
         Note, qsize() > 0 doesn’t guarantee that a subsequent get()
         will not raise :class:`.QueueEmpty`.
         """
-        async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
-            rows: list = await db.execute_fetchall(
-                """
-                SELECT count(*) FROM queue;
-                """
-            )  # type: ignore
-        return int(rows[0][0])
+        async with self.lock:
+            queue = await self._read_queue()
+            return len(queue)
 
     async def empty(self) -> bool:
         """Return True if the queue is empty, False otherwise.
@@ -55,40 +52,25 @@ class Queue:
         """Remove and return an item from the queue.
         If queue is empty, wait until an item is available.
         """
-
-        async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
-            while True:
-                try:
-                    return await self._fetch_item(db)
-                except QueueEmpty:
-                    pass
-                async with self.has_new_item:
-                    await self.has_new_item.wait()
+        while True:
+            try:
+                return await self.get_nowait()
+            except QueueEmpty:
+                pass
+            async with self.has_new_item:
+                await self.has_new_item.wait()
 
     async def get_nowait(self) -> Any:
         """Remove and return an item if one is immediately available,
         else raise :class:`.QueueEmpty`.
         """
-        async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
-            return await self._fetch_item(db)
-
-    async def _fetch_item(self, db: aiosqlite.Connection) -> Any:
-        """Make the DB call to remote and return an item
-        if one is immediately available else raise `QueueEmpty`.
-        """
-        db.row_factory = aiosqlite.Row
-        rows: list = await db.execute_fetchall(
-            """
-                DELETE FROM queue
-                RETURNING *
-                ORDER BY rowid
-                LIMIT 1;
-                """
-        )  # type: ignore
-        if rows:
-            item = pickle.loads(rows[0]["item"])
-            return item
-        raise QueueEmpty()
+        async with self.lock:
+            queue = await self._read_queue()
+            if queue:
+                item = queue.pop(0)
+                await self._write_queue(queue)
+                return item
+            raise QueueEmpty()
 
     async def put(self, item: Any) -> None:
         """Put an item into the queue.
@@ -96,19 +78,28 @@ class Queue:
         Args:
             item: Any Python object that can be pickled
         """
-        data = pickle.dumps(item)
-        async with aiosqlite.connect(self.db_path, isolation_level=None) as db:
-            await db.execute(
-                """
-                INSERT INTO queue (item) VALUES (?);
-                """,
-                (data,),
-            )
+        async with self.lock:
+            queue = await self._read_queue()
+            queue.append(item)
+            await self._write_queue(queue)
+
         async with self.has_new_item:
             self.has_new_item.notify()
 
+    async def _read_queue(self) -> list:
+        try:
+            async with aiofiles.open(self.data_path, "rb") as fp:
+                data = await fp.read()
+                return pickle.loads(data)
+        except FileNotFoundError:
+            return []
+
+    async def _write_queue(self, queue):
+        async with aiofiles.open(self.data_path, "wb") as fp:
+            await fp.write(pickle.dumps(queue))
+
     @classmethod
-    async def create(cls, db_path: Union[str, Path]) -> "Queue":
+    async def create(cls, data_path: Union[str, Path]) -> "Queue":
         """Create a new queue object.
 
         A new queue DB will be created for this queue if it does not exist.
@@ -117,16 +108,10 @@ class Queue:
         and it's content will be preserved.
 
         Args:
-            db_path: Path of the SQLite DB to be created / used. e.g. `queue.sqlite`
+            data_path: Path of the SQLite DB to be created / used. e.g. `queue.sqlite`
 
         Returns:
             newly created queue object
         """
-        db_path = Path(db_path)
-        async with aiosqlite.connect(db_path, isolation_level=None) as db:
-            await db.execute(
-                """
-                CREATE TABLE IF NOT EXISTS queue (item BLOB);
-                """
-            )
-        return cls(db_path)
+        data_path = Path(data_path)
+        return cls(data_path)

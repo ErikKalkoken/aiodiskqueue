@@ -83,7 +83,7 @@ async def main(db_path):
         logger.info("dif: %s", sorted(list(dif)))
 
 
-db_path = Path(__file__).parent / "masstest_queue.sqlite"
+db_path = Path(__file__).parent / "masstest_queue.dat"
 db_path.unlink(missing_ok=True)
 asyncio.run(main(db_path))
 db_path.unlink()
