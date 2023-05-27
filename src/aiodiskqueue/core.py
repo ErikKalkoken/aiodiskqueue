@@ -36,13 +36,13 @@ class Queue:
     def __init__(self, data_path: Path, maxsize: int, queue: list) -> None:
         self._data_path = Path(data_path)
         self._maxsize = max(0, maxsize)
-        self._data_lock = asyncio.Lock()
+        self._queue_lock = asyncio.Lock()
         self._has_new_item = asyncio.Condition()
         self._has_free_slots = asyncio.Condition()
         self._tasks_are_finished = asyncio.Condition()
         self._unfinished_tasks = 0
-        self._peak_size = 0  # measuring peak size of the queue
-        self._queue = queue
+        self._peak_size = len(queue)  # measuring peak size of the queue
+        self._queue = list(queue)
 
     @property
     def maxsize(self) -> int:
@@ -83,7 +83,7 @@ class Queue:
         """Remove and return an item if one is immediately available,
         else raise :class:`.QueueEmpty`.
         """
-        async with self._data_lock:
+        async with self._queue_lock:
             if not self._queue:
                 raise QueueEmpty()
 
@@ -132,7 +132,7 @@ class Queue:
         Args:
             item: Any Python object that can be pickled
         """
-        async with self._data_lock:
+        async with self._queue_lock:
             if self._maxsize and self.qsize() >= self._maxsize:
                 raise QueueFull
             self._queue.append(item)
@@ -175,7 +175,9 @@ class Queue:
     async def _write_queue(self):
         async with aiofiles.open(self._data_path, "wb", buffering=0) as fp:
             await fp.write(pickle.dumps(self._queue))
-        logger.debug("Wrote queue with %d items: %s", self.qsize(), self._data_path)
+        size = self.qsize()
+        self._peak_size = max(self._peak_size, size)
+        logger.debug("Wrote queue with %d items: %s", size, self._data_path)
 
     @staticmethod
     async def _read_queue(data_path: Path) -> list:
@@ -188,11 +190,15 @@ class Queue:
         try:
             queue = pickle.loads(data)
         except pickle.PickleError:
-            logger.exception("Data file is corrupt. Will be re-created: %s", data_path)
+            logger.exception("Data file is corrupt. Will be discarded: %s", data_path)
             return []
 
-        size = len(queue)
-        logger.debug("Read queue with %d items: %s", size, data_path)
+        if queue:
+            logger.info(
+                "Resurrecting queue with %d items from file: %s",
+                len(queue),
+                data_path,
+            )
         return queue
 
     @classmethod

@@ -19,7 +19,7 @@ logging.basicConfig(level="INFO", format="%(asctime)s - %(levelname)s -  %(messa
 logger = logging.getLogger(__name__)
 
 ITEMS_AMOUNT = 5000
-PRODUCER_AMOUNT = 50
+PRODUCER_AMOUNT = 100
 
 
 def random_string(length: int) -> str:
@@ -60,7 +60,7 @@ async def main(db_path):
         source_queue.put_nowait(item)
 
     # create disk and destination queue
-    disk_queue = await aiodiskqueue.Queue.create(db_path)
+    disk_queue = await aiodiskqueue.Queue.create(db_path, maxsize=1000)
     result_queue = asyncio.Queue()
 
     # start producer and consumers and wait for producers to finish
