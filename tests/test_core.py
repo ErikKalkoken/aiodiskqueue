@@ -179,3 +179,22 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         item = await q.get_nowait()
         # then
         self.assertEqual(item, "item-2")
+
+    async def test_full_should_return_true_when_queue_is_full(self):
+        # given
+        q = Queue(self.data_path, maxsize=1)
+        await q.put_nowait(ItemFactory)
+        # when/then
+        self.assertTrue(await q.full())
+
+    async def test_full_should_return_false_when_queue_is_not_full(self):
+        # given
+        q = Queue(self.data_path, maxsize=1)
+        # when/then
+        self.assertFalse(await q.full())
+
+    async def test_full_should_return_false_when_queue_is_not_limited(self):
+        # given
+        q = Queue(self.data_path)
+        # when/then
+        self.assertFalse(await q.full())
