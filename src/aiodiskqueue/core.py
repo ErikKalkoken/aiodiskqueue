@@ -33,7 +33,9 @@ class Queue:
         self._data_path = Path(data_path)
         self._lock = asyncio.Lock()
         self._has_new_item = asyncio.Condition()
+        self._tasks_are_finished = asyncio.Condition()
         self._peak_size = 0  # measuring peak size of the queue
+        self._unfinished_tasks = 0
 
     async def qsize(self) -> int:
         """Return the approximate size of the queue.
@@ -86,6 +88,8 @@ class Queue:
             queue = await self._read_queue()
             queue.append(item)
             await self._write_queue(queue)
+            async with self._tasks_are_finished:
+                self._unfinished_tasks += 1
 
         async with self._has_new_item:
             self._has_new_item.notify()
@@ -111,3 +115,37 @@ class Queue:
         async with aiofiles.open(self._data_path, "wb") as fp:
             await fp.write(pickle.dumps(queue))
         logger.debug("Wrote queue with %d items: %s", len(queue), self._data_path)
+
+    async def task_done(self) -> None:
+        """Indicate that a formerly enqueued task is complete.
+
+        Used by queue consumers. For each get() used to fetch a task,
+        a subsequent call to task_done() tells the queue that the processing
+        on the task is complete.
+
+        If a join() is currently blocking, it will resume when all items have
+        been processed (meaning that a task_done() call was received for every
+        item that had been put() into the queue).
+
+        Raises ValueError if called more times than there were items placed in
+        the queue.
+        """
+        async with self._tasks_are_finished:
+            if self._unfinished_tasks <= 0:
+                raise ValueError("task_done() called too many times")
+
+            self._unfinished_tasks -= 1
+            if self._unfinished_tasks == 0:
+                self._tasks_are_finished.notify_all()
+
+    async def join(self) -> None:
+        """Block until all items in the queue have been gotten and processed.
+
+        The count of unfinished tasks goes up whenever an item is added to the
+        queue. The count goes down whenever a consumer calls task_done() to
+        indicate that the item was retrieved and all work on it is complete.
+        When the count of unfinished tasks drops to zero, join() unblocks.
+        """
+        async with self._tasks_are_finished:
+            if self._unfinished_tasks > 0:
+                await self._tasks_are_finished.wait()

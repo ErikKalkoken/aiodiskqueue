@@ -1,8 +1,8 @@
 import asyncio
 import shutil
 import tempfile
+import unittest
 from pathlib import Path
-from unittest import IsolatedAsyncioTestCase
 
 import aiofiles
 
@@ -11,7 +11,7 @@ from aiodiskqueue import Queue, QueueEmpty
 from .factories import ItemFactory
 
 
-class TestQueue(IsolatedAsyncioTestCase):
+class TestQueue(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.temp_dir = Path(tempfile.mkdtemp())
         self.db_path = self.temp_dir / "queue.dat"
@@ -106,3 +106,22 @@ class TestQueue(IsolatedAsyncioTestCase):
         item_new = await queue_2.get()
         # then
         self.assertEqual(item_new, item)
+
+    async def test_join_should_block_until_all_tasks_completed(self):
+        async def consumer(queue: Queue):
+            while True:
+                await queue.get()
+                await queue.task_done()
+
+        # given
+        queue = Queue(self.db_path)
+        for _ in range(10):
+            await queue.put(ItemFactory())
+
+        consumer_task = asyncio.create_task(consumer(queue))
+        # when
+        await queue.join()
+        # then
+        consumer_task.cancel()
+        result = await queue.empty()
+        self.assertTrue(result)
