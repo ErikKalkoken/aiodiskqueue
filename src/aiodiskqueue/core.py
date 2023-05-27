@@ -45,7 +45,7 @@ class Queue:
 
     async def qsize(self) -> int:
         """Return the approximate size of the queue.
-        Note, qsize() > 0 doesn’t guarantee that a subsequent get()
+        Note, qsize() > 0 doesn't guarantee that a subsequent get()
         will not raise :class:`.QueueEmpty`.
         """
         async with self._lock:
@@ -55,7 +55,7 @@ class Queue:
     async def empty(self) -> bool:
         """Return True if the queue is empty, False otherwise.
 
-        If empty() returns False it doesn’t guarantee
+        If empty() returns False it doesn't guarantee
         that a subsequent call to get() will not raise :class:`.QueueEmpty`.
         """
         return await self.qsize() == 0
@@ -105,12 +105,11 @@ class Queue:
 
             async with self._has_free_slots:
                 await self._has_free_slots.wait()
-            await asyncio.sleep(0.05)  # FIXME: Workaround for open write buffer bug
 
     async def put_nowait(self, item: Any) -> None:
         """Put an item into the queue without blocking.
 
-        If no free slot is immediately available, raise QueueFull.
+        If no free slot is immediately available, raise :class:`.QueueFull`.
 
         Args:
             item: Any Python object that can be pickled
@@ -129,7 +128,7 @@ class Queue:
 
     async def _read_queue(self) -> list:
         try:
-            async with aiofiles.open(self._data_path, "rb") as fp:
+            async with aiofiles.open(self._data_path, "rb", buffering=0) as fp:
                 data = await fp.read()
         except FileNotFoundError:
             return []
@@ -148,7 +147,7 @@ class Queue:
         return queue
 
     async def _write_queue(self, queue):
-        async with aiofiles.open(self._data_path, "wb") as fp:
+        async with aiofiles.open(self._data_path, "wb", buffering=0) as fp:
             await fp.write(pickle.dumps(queue))
         logger.debug("Wrote queue with %d items: %s", len(queue), self._data_path)
 
@@ -185,6 +184,3 @@ class Queue:
         async with self._tasks_are_finished:
             if self._unfinished_tasks > 0:
                 await self._tasks_are_finished.wait()
-                await asyncio.sleep(
-                    0.05
-                )  # FIXME: Workaround: ResourceWarning: unclosed file <_io.BufferedReader .. >
