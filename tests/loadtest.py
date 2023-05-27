@@ -60,7 +60,7 @@ async def main(db_path):
         source_queue.put_nowait(item)
 
     # create disk and destination queue
-    disk_queue = aiodiskqueue.Queue(db_path)
+    disk_queue = await aiodiskqueue.Queue.create(db_path)
     result_queue = asyncio.Queue()
 
     # start producer and consumers and wait for producers to finish

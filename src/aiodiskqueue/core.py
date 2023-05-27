@@ -30,15 +30,10 @@ class Queue:
 
     This class is not thread safe.
 
-    Args:
-        data_path: Path of the data file for this queue. e.g. `queue.dat`
-        maxsize: If maxsize is less than or equal to zero, the queue size is infinite.
-            If it is an integer greater than 0, then put() blocks
-            when the queue reaches maxsize until an item is removed by get().
-
+    Create a queue with the factory method :func:`create`.
     """
 
-    def __init__(self, data_path: Union[str, Path], maxsize: int = 0) -> None:
+    def __init__(self, data_path: Path, maxsize: int) -> None:
         self._data_path = Path(data_path)
         self._maxsize = max(0, maxsize)
         self._data_lock = asyncio.Lock()
@@ -204,3 +199,16 @@ class Queue:
         async with aiofiles.open(self._data_path, "wb", buffering=0) as fp:
             await fp.write(pickle.dumps(queue))
         logger.debug("Wrote queue with %d items: %s", len(queue), self._data_path)
+
+    @classmethod
+    async def create(cls, data_path: Union[str, Path], maxsize: int = 0) -> "Queue":
+        """Create a queue.
+
+        Args:
+            data_path: Path of the data file for this queue. e.g. `queue.dat`
+            maxsize: If maxsize is less than or equal to zero, the queue size is infinite.
+                If it is an integer greater than 0, then put() blocks
+                when the queue reaches maxsize until an item is removed by get().
+        """
+        data_path = Path(data_path)
+        return cls(data_path, maxsize)
