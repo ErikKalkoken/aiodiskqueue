@@ -198,3 +198,9 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         q = Queue(self.data_path)
         # when/then
         self.assertFalse(await q.full())
+
+    def test_creating_queue_with_maxsize_below_0_yields_unlimited_queue(self):
+        # when
+        q = Queue(self.data_path, maxsize=-1)
+        # then
+        self.assertEqual(q.maxsize, 0)

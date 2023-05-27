@@ -16,32 +16,37 @@ logger = logging.getLogger(__name__)
 class Queue:
     """A persistent AsyncIO FIFO queue.
 
-    The queue has no upper limit and is constrained by available disk space only.
+    The content of a queue is stored on disk in a data file.
+    This file usually only exists temporarily while there are items in the queue.
 
-    The content of the queue will be stored on disk in a data file.
-    The file only exists while there are items in the queue.
+    An existing data file is used to recreate a queue,
+    e.g. to preserve the queue content after a process restart
 
-    When a new queue object is created and the data file already exists
-    it will be reused to preserve it's content if possible.
-    Corrupted files will be re-created.
+    However, should the data file be corrupted it will be discarded
+    so the queue can continue to function normally.
+
+    Using two different instances with the same data file simultaneously
+    is not recommended as it may lead to data corruption.
 
     This class is not thread safe.
 
-    Using two different instances with the same data file is not recommended as it may lead to data corruption.
-
     Args:
         data_path: Path of the data file for this queue. e.g. `queue.dat`
+        maxsize: If maxsize is less than or equal to zero, the queue size is infinite.
+            If it is an integer greater than 0, then put() blocks
+            when the queue reaches maxsize until an item is removed by get().
+
     """
 
     def __init__(self, data_path: Union[str, Path], maxsize: int = 0) -> None:
         self._data_path = Path(data_path)
-        self._maxsize = maxsize
+        self._maxsize = max(0, maxsize)
         self._data_lock = asyncio.Lock()
         self._has_new_item = asyncio.Condition()
         self._has_free_slots = asyncio.Condition()
         self._tasks_are_finished = asyncio.Condition()
-        self._peak_size = 0  # measuring peak size of the queue
         self._unfinished_tasks = 0
+        self._peak_size = 0  # measuring peak size of the queue
 
     @property
     def maxsize(self) -> int:
@@ -60,7 +65,7 @@ class Queue:
         """Return True if there are maxsize items in the queue.
 
         If the queue was initialized with maxsize=0 (the default),
-        then full() never returns True.
+        then full() always returns False.
         """
         if not self._maxsize:
             return False

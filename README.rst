@@ -8,10 +8,12 @@ Persistent queue for Python AsyncIO.
 Description
 -----------
 
-This library provides a persistent queue for Python AsyncIO.
+This library provides a persistent FIFO queue for Python AsyncIO:
 
-It has an API similar to the standard `asyncio.Queue <https://docs.python.org/3/library/asyncio-queue.html#queue>`_,
-but items in the queue will persists between process restarts.
+- Content is stored on disk, so a queue will for example survive a process restart
+- Complete feature parity and very similar API with `asyncio.Queue <https://docs.python.org/3/library/asyncio-queue.html#queue>`_ from Python's standard library
+- Error logging
+- Fully tested
 
 Usage
 -----
@@ -31,12 +33,12 @@ Here is a basic example on how to use the queue:
 
     asyncio.run(main())
 
-Please see the examples folder for more usage examples.
+Please see the **examples** folder for more usage examples.
 
 Installation
 ------------
 
-You can install directly from PyPI with the following command:
+You can install this library directly from PyPI with the following command:
 
 .. code:: shell
 
