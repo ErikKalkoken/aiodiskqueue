@@ -18,7 +18,7 @@ logging.basicConfig(level="INFO", format="%(asctime)s - %(levelname)s -  %(messa
 
 logger = logging.getLogger(__name__)
 
-ITEMS_AMOUNT = 10000
+ITEMS_AMOUNT = 5000
 PRODUCER_AMOUNT = 50
 
 
@@ -47,6 +47,7 @@ async def consumer(disk_queue: aiodiskqueue.Queue, result_queue: asyncio.Queue):
         while True:
             item = await disk_queue.get()
             await result_queue.put(item)
+            await disk_queue.task_done()
     except Exception:
         logger.exception("Consumer error")
 
@@ -72,8 +73,7 @@ async def main(db_path):
 
     # wait for consumer to finish
     logger.info("Waiting for consumer to complete...")
-    while not await disk_queue.empty():
-        await asyncio.sleep(0.5)
+    await disk_queue.join()
     consumer_task.cancel()
 
     # measure duration and throughput
@@ -103,4 +103,3 @@ async def main(db_path):
 db_path = Path(__file__).parent / "loadtest_queue.dat"
 db_path.unlink(missing_ok=True)
 asyncio.run(main(db_path))
-db_path.unlink()

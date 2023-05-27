@@ -171,10 +171,10 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         await q.put_nowait("item-1")
 
         # when
-        async with asyncio.TaskGroup() as tg:
-            tg.create_task(producer("item-2"))
-            await asyncio.sleep(1)  # producer sees a full queue when task starts
-            tg.create_task(consumer())
+        producer_task = asyncio.create_task(producer("item-2"))
+        await asyncio.sleep(1)  # producer sees a full queue when task starts
+        consumer_task = asyncio.create_task(consumer())
+        await asyncio.gather(producer_task, consumer_task)
 
         item = await q.get_nowait()
         # then
