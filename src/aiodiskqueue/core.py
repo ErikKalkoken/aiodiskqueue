@@ -33,7 +33,7 @@ class Queue:
     Create a queue with the factory method :func:`create`.
     """
 
-    def __init__(self, data_path: Path, maxsize: int) -> None:
+    def __init__(self, data_path: Path, maxsize: int, queue: list) -> None:
         self._data_path = Path(data_path)
         self._maxsize = max(0, maxsize)
         self._data_lock = asyncio.Lock()
@@ -42,21 +42,22 @@ class Queue:
         self._tasks_are_finished = asyncio.Condition()
         self._unfinished_tasks = 0
         self._peak_size = 0  # measuring peak size of the queue
+        self._queue = queue
 
     @property
     def maxsize(self) -> int:
         """Number of items allowed in the queue. 0 means unlimited."""
         return self._maxsize
 
-    async def empty(self) -> bool:
+    def empty(self) -> bool:
         """Return True if the queue is empty, False otherwise.
 
         If empty() returns False it doesn't guarantee
         that a subsequent call to get() will not raise :class:`.QueueEmpty`.
         """
-        return await self.qsize() == 0
+        return self.qsize() == 0
 
-    async def full(self) -> bool:
+    def full(self) -> bool:
         """Return True if there are maxsize items in the queue.
 
         If the queue was initialized with maxsize=0 (the default),
@@ -64,7 +65,7 @@ class Queue:
         """
         if not self._maxsize:
             return False
-        return await self.qsize() >= self._maxsize
+        return self.qsize() >= self._maxsize
 
     async def get(self) -> Any:
         """Remove and return an item from the queue. If queue is empty,
@@ -83,13 +84,12 @@ class Queue:
         else raise :class:`.QueueEmpty`.
         """
         async with self._data_lock:
-            queue = await self._read_queue()
-            if not queue:
+            if not self._queue:
                 raise QueueEmpty()
 
-            item = queue.pop(0)
-            if queue:
-                await self._write_queue(queue)
+            item = self._queue.pop(0)
+            if self._queue:
+                await self._write_queue()
             else:
                 await aiofiles.os.remove(self._data_path)
 
@@ -133,25 +133,22 @@ class Queue:
             item: Any Python object that can be pickled
         """
         async with self._data_lock:
-            queue = await self._read_queue()
-            if self._maxsize and len(queue) >= self._maxsize:
+            if self._maxsize and len(self._queue) >= self._maxsize:
                 raise QueueFull
-            queue.append(item)
-            await self._write_queue(queue)
+            self._queue.append(item)
+            await self._write_queue()
             async with self._tasks_are_finished:
                 self._unfinished_tasks += 1
 
         async with self._has_new_item:
             self._has_new_item.notify()
 
-    async def qsize(self) -> int:
+    def qsize(self) -> int:
         """Return the approximate size of the queue.
         Note, qsize() > 0 doesn't guarantee that a subsequent get()
         will not raise :class:`.QueueEmpty`.
         """
-        async with self._data_lock:
-            queue = await self._read_queue()
-            return len(queue)
+        return len(self._queue)
 
     async def task_done(self) -> None:
         """Indicate that a formerly enqueued task is complete.
@@ -175,9 +172,15 @@ class Queue:
             if self._unfinished_tasks == 0:
                 self._tasks_are_finished.notify_all()
 
-    async def _read_queue(self) -> list:
+    async def _write_queue(self):
+        async with aiofiles.open(self._data_path, "wb", buffering=0) as fp:
+            await fp.write(pickle.dumps(self._queue))
+        logger.debug("Wrote queue with %d items: %s", len(self._queue), self._data_path)
+
+    @staticmethod
+    async def _read_queue(data_path: Path) -> list:
         try:
-            async with aiofiles.open(self._data_path, "rb", buffering=0) as fp:
+            async with aiofiles.open(data_path, "rb", buffering=0) as fp:
                 data = await fp.read()
         except FileNotFoundError:
             return []
@@ -185,20 +188,12 @@ class Queue:
         try:
             queue = pickle.loads(data)
         except pickle.PickleError:
-            logger.exception(
-                "Data file is corrupt. Will be re-created: %s", self._data_path
-            )
+            logger.exception("Data file is corrupt. Will be re-created: %s", data_path)
             return []
 
         size = len(queue)
-        logger.debug("Read queue with %d items: %s", size, self._data_path)
-        self._peak_size = max(size, self._peak_size)
+        logger.debug("Read queue with %d items: %s", size, data_path)
         return queue
-
-    async def _write_queue(self, queue):
-        async with aiofiles.open(self._data_path, "wb", buffering=0) as fp:
-            await fp.write(pickle.dumps(queue))
-        logger.debug("Wrote queue with %d items: %s", len(queue), self._data_path)
 
     @classmethod
     async def create(cls, data_path: Union[str, Path], maxsize: int = 0) -> "Queue":
@@ -211,4 +206,5 @@ class Queue:
                 when the queue reaches maxsize until an item is removed by get().
         """
         data_path = Path(data_path)
-        return cls(data_path, maxsize)
+        queue = await cls._read_queue(data_path)
+        return cls(data_path, maxsize, queue)

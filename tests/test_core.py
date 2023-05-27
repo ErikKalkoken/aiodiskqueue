@@ -23,7 +23,7 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         # given
         q = await Queue.create(self.data_path)
         # when
-        result = await q.qsize()
+        result = q.qsize()
         # then
         self.assertEqual(result, 0)
 
@@ -34,7 +34,7 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         await q.put_nowait(ItemFactory())
         await q.put_nowait(ItemFactory())
         # then
-        result = await q.qsize()
+        result = q.qsize()
         self.assertEqual(result, 2)
 
     async def test_should_get_item(self):
@@ -59,14 +59,14 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         # given
         q = await Queue.create(self.data_path)
         # when/then
-        self.assertTrue(await q.empty())
+        self.assertTrue(q.empty())
 
     async def test_should_not_report_as_empty(self):
         # given
         q = await Queue.create(self.data_path)
         await q.put_nowait(ItemFactory())
         # when/then
-        self.assertFalse(await q.empty())
+        self.assertFalse(q.empty())
 
     async def test_get_should_wait_until_item_is_available(self):
         async def consumer():
@@ -91,7 +91,7 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
             await fp.write(b"invalid-data")
         q = await Queue.create(self.data_path)
         # when
-        result = await q.qsize()
+        result = q.qsize()
         # then
         self.assertEqual(result, 0)
 
@@ -123,7 +123,7 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         await queue.join()
         # then
         consumer_task.cancel()
-        result = await queue.empty()
+        result = queue.empty()
         self.assertTrue(result)
 
     async def test_should_delete_file_when_queue_is_empty(self):
@@ -185,19 +185,19 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         q = await Queue.create(self.data_path, maxsize=1)
         await q.put_nowait(ItemFactory)
         # when/then
-        self.assertTrue(await q.full())
+        self.assertTrue(q.full())
 
     async def test_full_should_return_false_when_queue_is_not_full(self):
         # given
         q = await Queue.create(self.data_path, maxsize=1)
         # when/then
-        self.assertFalse(await q.full())
+        self.assertFalse(q.full())
 
     async def test_full_should_return_false_when_queue_is_not_limited(self):
         # given
         q = await Queue.create(self.data_path)
         # when/then
-        self.assertFalse(await q.full())
+        self.assertFalse(q.full())
 
     async def test_creating_queue_with_maxsize_below_0_yields_unlimited_queue(self):
         # when
