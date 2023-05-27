@@ -194,12 +194,11 @@ class Queue:
             logger.exception("Data file is corrupt. Will be discarded: %s", data_path)
             return []
 
-        if queue:
-            logger.info(
-                "Resurrecting queue with %d items from file: %s",
-                len(queue),
-                data_path,
-            )
+        logger.info(
+            "Resurrecting queue with %d items from file: %s",
+            len(queue),
+            data_path,
+        )
         return queue
 
     @classmethod
