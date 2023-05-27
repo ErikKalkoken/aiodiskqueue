@@ -6,7 +6,7 @@ from pathlib import Path
 
 import aiofiles
 
-from aiodiskqueue import Queue, QueueEmpty
+from aiodiskqueue import Queue, QueueEmpty, QueueFull
 
 from .factories import ItemFactory
 
@@ -31,8 +31,8 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         # given
         q = Queue(self.data_path)
         # when
-        await q.put(ItemFactory())
-        await q.put(ItemFactory())
+        await q.put_nowait(ItemFactory())
+        await q.put_nowait(ItemFactory())
         # then
         result = await q.qsize()
         self.assertEqual(result, 2)
@@ -41,8 +41,8 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         # given
         q = Queue(self.data_path)
         item = ItemFactory()
-        await q.put(item)
-        await q.put(ItemFactory())
+        await q.put_nowait(item)
+        await q.put_nowait(ItemFactory())
         # when
         result = await q.get_nowait()
         # then
@@ -64,7 +64,7 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
     async def test_should_not_report_as_empty(self):
         # given
         q = Queue(self.data_path)
-        await q.put(ItemFactory())
+        await q.put_nowait(ItemFactory())
         # when/then
         self.assertFalse(await q.empty())
 
@@ -80,7 +80,7 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         # when
         await asyncio.sleep(1)  # consumer sees an empty queue when task starts
         item = ItemFactory()
-        await q.put(item)
+        await q.put_nowait(item)
         # then
         item_new = await queue_2.get()
         self.assertEqual(item_new, item)
@@ -99,7 +99,7 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         # given
         queue_1 = Queue(self.data_path)
         item = ItemFactory()
-        await queue_1.put(item)
+        await queue_1.put_nowait(item)
         # when
         del queue_1
         queue_2 = Queue(self.data_path)
@@ -116,7 +116,7 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         # given
         queue = Queue(self.data_path)
         for _ in range(10):
-            await queue.put(ItemFactory())
+            await queue.put_nowait(ItemFactory())
 
         consumer_task = asyncio.create_task(consumer(queue))
         # when
@@ -129,7 +129,7 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
     async def test_should_delete_file_when_queue_is_empty(self):
         # given
         q = Queue(self.data_path)
-        await q.put(ItemFactory)
+        await q.put_nowait(ItemFactory)
         # when
         await q.get()
         # then
@@ -138,7 +138,7 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
     async def test_should_raise_error_when_calling_task_done_too_often(self):
         # given
         q = Queue(self.data_path)
-        await q.put(ItemFactory)
+        await q.put_nowait(ItemFactory)
         await q.get()
         await q.task_done()
         # when/then
@@ -150,3 +150,32 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         q = Queue(self.data_path)
         # when/then
         await q.join()
+
+    async def test_should_raise_error_when_putting_into_full_queue(self):
+        # given
+        q = Queue(self.data_path, maxsize=1)
+        await q.put_nowait(ItemFactory)
+        # when
+        with self.assertRaises(QueueFull):
+            await q.put_nowait(ItemFactory)
+
+    async def test_should_block_until_queue_has_free_slots(self):
+        async def producer(item):
+            await q.put(item)
+
+        async def consumer():
+            return await q.get()
+
+        # given
+        q = Queue(self.data_path, maxsize=1)
+        await q.put_nowait("item-1")
+
+        # when
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(producer("item-2"))
+            await asyncio.sleep(1)  # producer sees a full queue when task starts
+            tg.create_task(consumer())
+
+        item = await q.get_nowait()
+        # then
+        self.assertEqual(item, "item-2")

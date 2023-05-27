@@ -6,4 +6,8 @@ class QueueException(Exception):
 
 
 class QueueEmpty(QueueException):
-    """The queue is empty."""
+    """Queue is empty."""
+
+
+class QueueFull(QueueException):
+    """Queue is full."""

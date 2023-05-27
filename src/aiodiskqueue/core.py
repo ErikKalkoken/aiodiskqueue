@@ -8,7 +8,7 @@ from typing import Any, Union
 import aiofiles
 import aiofiles.os
 
-from aiodiskqueue.exceptions import QueueEmpty
+from aiodiskqueue.exceptions import QueueEmpty, QueueFull
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +33,12 @@ class Queue:
         data_path: Path of the data file for this queue. e.g. `queue.dat`
     """
 
-    def __init__(self, data_path: Union[str, Path]) -> None:
+    def __init__(self, data_path: Union[str, Path], maxsize: int = 0) -> None:
         self._data_path = Path(data_path)
+        self._maxsize = maxsize
         self._lock = asyncio.Lock()
         self._has_new_item = asyncio.Condition()
+        self._has_free_slots = asyncio.Condition()
         self._tasks_are_finished = asyncio.Condition()
         self._peak_size = 0  # measuring peak size of the queue
         self._unfinished_tasks = 0
@@ -59,8 +61,8 @@ class Queue:
         return await self.qsize() == 0
 
     async def get(self) -> Any:
-        """Remove and return an item from the queue.
-        If queue is empty, wait until an item is available.
+        """Remove and return an item from the queue. If queue is empty,
+        wait until an item is available.
         """
         while True:
             try:
@@ -76,23 +78,47 @@ class Queue:
         """
         async with self._lock:
             queue = await self._read_queue()
+            if not queue:
+                raise QueueEmpty()
+
+            item = queue.pop(0)
             if queue:
-                item = queue.pop(0)
-                if queue:
-                    await self._write_queue(queue)
-                else:
-                    await aiofiles.os.remove(self._data_path)
-                return item
-            raise QueueEmpty()
+                await self._write_queue(queue)
+            else:
+                await aiofiles.os.remove(self._data_path)
+
+        if self._maxsize:
+            async with self._has_free_slots:
+                self._has_free_slots.notify()
+
+        return item
 
     async def put(self, item: Any) -> None:
-        """Put an item into the queue.
+        """Put an item into the queue. If the queue is full,
+        wait until a free slot is available before adding the item.
+        """
+        while True:
+            try:
+                return await self.put_nowait(item)
+            except QueueFull:
+                pass
+
+            async with self._has_free_slots:
+                await self._has_free_slots.wait()
+            await asyncio.sleep(0.05)  # FIXME: Workaround for open write buffer bug
+
+    async def put_nowait(self, item: Any) -> None:
+        """Put an item into the queue without blocking.
+
+        If no free slot is immediately available, raise QueueFull.
 
         Args:
             item: Any Python object that can be pickled
         """
         async with self._lock:
             queue = await self._read_queue()
+            if self._maxsize and len(queue) >= self._maxsize:
+                raise QueueFull
             queue.append(item)
             await self._write_queue(queue)
             async with self._tasks_are_finished:
