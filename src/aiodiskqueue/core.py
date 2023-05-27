@@ -98,18 +98,21 @@ class Queue:
         try:
             async with aiofiles.open(self._data_path, "rb") as fp:
                 data = await fp.read()
-                queue = pickle.loads(data)
-                size = len(queue)
-                logger.debug("Read queue with %d items: %s", size, self._data_path)
-                self._peak_size = max(size, self._peak_size)
-                return queue
         except FileNotFoundError:
             return []
+
+        try:
+            queue = pickle.loads(data)
         except pickle.PickleError:
             logger.exception(
                 "Data file is corrupt. Will be re-created: %s", self._data_path
             )
             return []
+
+        size = len(queue)
+        logger.debug("Read queue with %d items: %s", size, self._data_path)
+        self._peak_size = max(size, self._peak_size)
+        return queue
 
     async def _write_queue(self, queue):
         async with aiofiles.open(self._data_path, "wb") as fp:
