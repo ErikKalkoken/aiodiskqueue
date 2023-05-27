@@ -19,13 +19,13 @@ templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Options for autodoc -----------------------------------------------------
-# autoclass_content = "both"
 autodoc_default_options = {
     "members": True,
     "member-order": "alphabetical",
     "undoc-members": False,
     "exclude-members": "__weakref__",
 }
+autoclass_content = "class"
 autodoc_class_signature = "separated"
 
 # -- Options for HTML output -------------------------------------------------

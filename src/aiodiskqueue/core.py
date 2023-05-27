@@ -34,6 +34,7 @@ class Queue:
     """
 
     def __init__(self, data_path: Path, maxsize: int, queue: list) -> None:
+        """:meta private:"""
         self._data_path = Path(data_path)
         self._maxsize = max(0, maxsize)
         self._queue_lock = asyncio.Lock()

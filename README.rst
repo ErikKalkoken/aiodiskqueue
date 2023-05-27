@@ -10,9 +10,11 @@ Description
 
 This library provides a persistent FIFO queue for Python AsyncIO:
 
-- Content is stored on disk, so a queue will for example survive a process restart
-- Complete feature parity and very similar API with `asyncio.Queue <https://docs.python.org/3/library/asyncio-queue.html#queue>`_ from Python's standard library
-- Error logging
+- Queue content is preserved after a by process restart
+- Feature parity with Python's `asyncio.Queue <https://docs.python.org/3/library/asyncio-queue.html#queue>`_
+- Similar API to Python's `asyncio.Queue <https://docs.python.org/3/library/asyncio-queue.html#queue>`_
+- Designed for durability and decent performance
+- Sane logging
 - Fully tested
 
 Usage
