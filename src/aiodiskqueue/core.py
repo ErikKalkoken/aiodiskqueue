@@ -152,3 +152,6 @@ class Queue:
         async with self._tasks_are_finished:
             if self._unfinished_tasks > 0:
                 await self._tasks_are_finished.wait()
+                await asyncio.sleep(
+                    0.05
+                )  # FIXME: Workaround: ResourceWarning: unclosed file <_io.BufferedReader .. >
