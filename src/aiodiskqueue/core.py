@@ -133,7 +133,7 @@ class Queue:
             item: Any Python object that can be pickled
         """
         async with self._data_lock:
-            if self._maxsize and len(self._queue) >= self._maxsize:
+            if self._maxsize and self.qsize() >= self._maxsize:
                 raise QueueFull
             self._queue.append(item)
             await self._write_queue()
@@ -175,7 +175,7 @@ class Queue:
     async def _write_queue(self):
         async with aiofiles.open(self._data_path, "wb", buffering=0) as fp:
             await fp.write(pickle.dumps(self._queue))
-        logger.debug("Wrote queue with %d items: %s", len(self._queue), self._data_path)
+        logger.debug("Wrote queue with %d items: %s", self.qsize(), self._data_path)
 
     @staticmethod
     async def _read_queue(data_path: Path) -> list:
