@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Union
 
 import aiofiles
+import aiofiles.os
 
 from aiodiskqueue.exceptions import QueueEmpty
 
@@ -17,9 +18,12 @@ class Queue:
 
     The queue has no upper limit and is constrained by available disk space only.
 
-    A new data file will be created for every new queue object if it does not exist.
-    If a data file already exists it will be reused
-    and it's content will be preserved if possible. Corrupted files will be re-created.
+    The content of the queue will be stored on disk in a data file.
+    The file only exists while there are items in the queue.
+
+    When a new queue object is created and the data file already exists
+    it will be reused to preserve it's content if possible.
+    Corrupted files will be re-created.
 
     This class is not thread safe.
 
@@ -74,7 +78,10 @@ class Queue:
             queue = await self._read_queue()
             if queue:
                 item = queue.pop(0)
-                await self._write_queue(queue)
+                if queue:
+                    await self._write_queue(queue)
+                else:
+                    await aiofiles.os.remove(self._data_path)
                 return item
             raise QueueEmpty()
 

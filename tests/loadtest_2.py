@@ -103,4 +103,3 @@ async def main(db_path):
 db_path = Path(__file__).parent / "loadtest_queue.dat"
 db_path.unlink(missing_ok=True)
 asyncio.run(main(db_path))
-db_path.unlink()
