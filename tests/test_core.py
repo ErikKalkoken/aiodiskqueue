@@ -27,6 +27,11 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
         # then
         self.assertEqual(result, 0)
 
+    def test_should_raise_error_when_trying_to_instantiate_directly(self):
+        # when/then
+        with self.assertRaises(TypeError):
+            Queue()
+
     async def test_should_put_items_and_measure_size(self):
         # given
         q = await Queue.create(self.data_path)

@@ -23,7 +23,7 @@ autodoc_default_options = {
     "members": True,
     "member-order": "alphabetical",
     "undoc-members": False,
-    "exclude-members": "__weakref__",
+    "exclude-members": "__weakref__, __init__",
 }
 autoclass_content = "class"
 autodoc_class_signature = "separated"

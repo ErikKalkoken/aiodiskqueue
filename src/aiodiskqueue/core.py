@@ -9,11 +9,12 @@ import aiofiles
 import aiofiles.os
 
 from aiodiskqueue.exceptions import QueueEmpty, QueueFull
+from aiodiskqueue.utils import NoDirectInstantiation
 
 logger = logging.getLogger(__name__)
 
 
-class Queue:
+class Queue(metaclass=NoDirectInstantiation):
     """A persistent AsyncIO FIFO queue.
 
     The content of a queue is stored on disk in a data file.
@@ -30,11 +31,15 @@ class Queue:
 
     This class is not thread safe.
 
-    Create a queue with the factory method :func:`create`.
+    To create a new object the factory method :func:`create` must be used.
     """
 
     def __init__(self, data_path: Path, maxsize: int, queue: list) -> None:
-        """:meta private:"""
+        """Direct instantiation would break the persistance feature
+        and has therefore been disabled.
+
+        :meta private:
+        """
         self._data_path = Path(data_path)
         self._maxsize = max(0, maxsize)
         self._queue_lock = asyncio.Lock()
@@ -215,4 +220,4 @@ class Queue:
         """
         data_path = Path(data_path)
         queue = await cls._read_queue(data_path)
-        return cls(data_path, maxsize, queue)
+        return cls._create(data_path, maxsize, queue)
