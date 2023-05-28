@@ -8,77 +8,23 @@ from .factories import ItemFactory
 from .helpers import QueueAsyncioTestCase
 
 
-class TestQueue(QueueAsyncioTestCase):
+class TestCreateQueue(QueueAsyncioTestCase):
     async def test_should_create_queue_and_measure_size(self):
         # given
         q = await Queue.create(self.data_path)
-        # when
-        result = q.qsize()
-        # then
-        self.assertEqual(result, 0)
+        # when/then
+        self.assertIsInstance(q, Queue)
 
     def test_should_raise_error_when_trying_to_instantiate_directly(self):
         # when/then
         with self.assertRaises(TypeError):
             Queue()
 
-    async def test_should_put_items_and_measure_size(self):
-        # given
-        q = await Queue.create(self.data_path)
+    async def test_creating_queue_with_maxsize_below_0_yields_unlimited_queue(self):
         # when
-        await q.put_nowait(ItemFactory())
-        await q.put_nowait(ItemFactory())
+        q = await Queue.create(self.data_path, maxsize=-1)
         # then
-        result = q.qsize()
-        self.assertEqual(result, 2)
-
-    async def test_should_get_item(self):
-        # given
-        q = await Queue.create(self.data_path)
-        item = ItemFactory()
-        await q.put_nowait(item)
-        await q.put_nowait(ItemFactory())
-        # when
-        result = await q.get_nowait()
-        # then
-        self.assertEqual(result, item)
-
-    async def test_should_raise_exception_when_get_on_empty_queue(self):
-        # given
-        q = await Queue.create(self.data_path)
-        # when/then
-        with self.assertRaises(QueueEmpty):
-            await q.get_nowait()
-
-    async def test_should_report_as_empty(self):
-        # given
-        q = await Queue.create(self.data_path)
-        # when/then
-        self.assertTrue(q.empty())
-
-    async def test_should_not_report_as_empty(self):
-        # given
-        q = await Queue.create(self.data_path)
-        await q.put_nowait(ItemFactory())
-        # when/then
-        self.assertFalse(q.empty())
-
-    async def test_get_should_wait_until_item_is_available(self):
-        async def consumer():
-            item = await input_queue.get()
-            await result_queue.put(item)
-
-        # given
-        input_queue = await Queue.create(self.data_path)
-        result_queue = asyncio.Queue()
-        asyncio.create_task(consumer())
-        # when
-        await asyncio.sleep(1)  # consumer sees an empty queue when task starts
-        item = ItemFactory()
-        await input_queue.put_nowait(item)
-        # then
-        item_new = await result_queue.get()
-        self.assertEqual(item_new, item)
+        self.assertEqual(q.maxsize, 0)
 
     async def test_should_create_new_file_when_current_file_is_corrupt(self):
         # given
@@ -102,24 +48,17 @@ class TestQueue(QueueAsyncioTestCase):
         # then
         self.assertEqual(item_new, item)
 
-    async def test_join_should_block_until_all_tasks_completed(self):
-        async def consumer(queue: Queue):
-            while True:
-                await queue.get()
-                await queue.task_done()
 
+class TestPutIntoQueue(QueueAsyncioTestCase):
+    async def test_should_put_items_and_measure_size(self):
         # given
-        queue = await Queue.create(self.data_path)
-        for _ in range(10):
-            await queue.put_nowait(ItemFactory())
-
-        consumer_task = asyncio.create_task(consumer(queue))
+        q = await Queue.create(self.data_path)
         # when
-        await queue.join()
+        await q.put_nowait(ItemFactory())
+        await q.put_nowait(ItemFactory())
         # then
-        consumer_task.cancel()
-        result = queue.empty()
-        self.assertTrue(result)
+        result = q.qsize()
+        self.assertEqual(result, 2)
 
     async def test_should_delete_file_when_queue_is_empty(self):
         # given
@@ -130,22 +69,6 @@ class TestQueue(QueueAsyncioTestCase):
         # then
         self.assertFalse(self.data_path.exists())
 
-    async def test_should_raise_error_when_calling_task_done_too_often(self):
-        # given
-        q = await Queue.create(self.data_path)
-        await q.put_nowait(ItemFactory)
-        await q.get()
-        await q.task_done()
-        # when/then
-        with self.assertRaises(ValueError):
-            await q.task_done()
-
-    async def test_join_return_when_queue_is_empty(self):
-        # given
-        q = await Queue.create(self.data_path)
-        # when/then
-        await q.join()
-
     async def test_should_raise_error_when_putting_into_full_queue(self):
         # given
         q = await Queue.create(self.data_path, maxsize=1)
@@ -154,7 +77,7 @@ class TestQueue(QueueAsyncioTestCase):
         with self.assertRaises(QueueFull):
             await q.put_nowait(ItemFactory)
 
-    async def test_should_block_until_queue_has_free_slots(self):
+    async def test_put_should_block_until_queue_has_free_slots(self):
         async def producer(item):
             await q.put(item)
 
@@ -175,6 +98,95 @@ class TestQueue(QueueAsyncioTestCase):
         # then
         self.assertEqual(item, "item-2")
 
+
+class TestRetrieveFromQueue(QueueAsyncioTestCase):
+    async def test_should_get_item(self):
+        # given
+        q = await Queue.create(self.data_path)
+        item = ItemFactory()
+        await q.put_nowait(item)
+        await q.put_nowait(ItemFactory())
+        # when
+        result = await q.get_nowait()
+        # then
+        self.assertEqual(result, item)
+
+    async def test_should_raise_exception_when_get_on_empty_queue(self):
+        # given
+        q = await Queue.create(self.data_path)
+        # when/then
+        with self.assertRaises(QueueEmpty):
+            await q.get_nowait()
+
+    async def test_get_should_wait_until_item_is_available(self):
+        async def consumer():
+            item = await input_queue.get()
+            await result_queue.put(item)
+
+        # given
+        input_queue = await Queue.create(self.data_path)
+        result_queue = asyncio.Queue()
+        asyncio.create_task(consumer())
+        # when
+        await asyncio.sleep(1)  # consumer sees an empty queue when task starts
+        item = ItemFactory()
+        await input_queue.put_nowait(item)
+        # then
+        item_new = await result_queue.get()
+        self.assertEqual(item_new, item)
+
+    async def test_should_raise_error_when_calling_task_done_too_often(self):
+        # given
+        q = await Queue.create(self.data_path)
+        await q.put_nowait(ItemFactory)
+        await q.get()
+        await q.task_done()
+        # when/then
+        with self.assertRaises(ValueError):
+            await q.task_done()
+
+
+class TestWaitUntilQueueIsEmpty(QueueAsyncioTestCase):
+    async def test_join_should_block_until_all_tasks_completed(self):
+        async def consumer(queue: Queue):
+            while True:
+                await queue.get()
+                await queue.task_done()
+
+        # given
+        queue = await Queue.create(self.data_path)
+        for _ in range(10):
+            await queue.put_nowait(ItemFactory())
+
+        consumer_task = asyncio.create_task(consumer(queue))
+        # when
+        await queue.join()
+        # then
+        consumer_task.cancel()
+        result = queue.empty()
+        self.assertTrue(result)
+
+    async def test_join_return_when_queue_is_empty(self):
+        # given
+        q = await Queue.create(self.data_path)
+        # when/then
+        await q.join()
+
+
+class TestInformationAboutQueue(QueueAsyncioTestCase):
+    async def test_should_report_as_empty(self):
+        # given
+        q = await Queue.create(self.data_path)
+        # when/then
+        self.assertTrue(q.empty())
+
+    async def test_should_not_report_as_empty(self):
+        # given
+        q = await Queue.create(self.data_path)
+        await q.put_nowait(ItemFactory())
+        # when/then
+        self.assertFalse(q.empty())
+
     async def test_full_should_return_true_when_queue_is_full(self):
         # given
         q = await Queue.create(self.data_path, maxsize=1)
@@ -193,9 +205,3 @@ class TestQueue(QueueAsyncioTestCase):
         q = await Queue.create(self.data_path)
         # when/then
         self.assertFalse(q.full())
-
-    async def test_creating_queue_with_maxsize_below_0_yields_unlimited_queue(self):
-        # when
-        q = await Queue.create(self.data_path, maxsize=-1)
-        # then
-        self.assertEqual(q.maxsize, 0)
