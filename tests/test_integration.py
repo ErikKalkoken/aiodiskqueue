@@ -1,13 +1,10 @@
 import asyncio
 import logging
-import shutil
-import tempfile
-import unittest
-from pathlib import Path
 
 import aiodiskqueue
 
 from .factories import ItemFactory
+from .helpers import QueueAsyncioTestCase
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +34,7 @@ async def consumer(disk_queue: aiodiskqueue.Queue, result_queue: asyncio.Queue):
         logger.exception("Consumer error")
 
 
-class TestIntegration(unittest.IsolatedAsyncioTestCase):
-    def setUp(self) -> None:
-        self.temp_dir = Path(tempfile.mkdtemp())
-        self.data_path = self.temp_dir / "queue.dat"
-
-    def tearDown(self) -> None:
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-
+class TestIntegration(QueueAsyncioTestCase):
     async def test_multiple_consumer_and_producers(self):
         # parameters
         ITEMS_AMOUNT = 500

@@ -1,24 +1,14 @@
 import asyncio
-import shutil
-import tempfile
-import unittest
-from pathlib import Path
 
 import aiofiles
 
 from aiodiskqueue import Queue, QueueEmpty, QueueFull
 
 from .factories import ItemFactory
+from .helpers import QueueAsyncioTestCase
 
 
-class TestQueue(unittest.IsolatedAsyncioTestCase):
-    def setUp(self) -> None:
-        self.temp_dir = Path(tempfile.mkdtemp())
-        self.data_path = self.temp_dir / "queue.dat"
-
-    def tearDown(self) -> None:
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-
+class TestQueue(QueueAsyncioTestCase):
     async def test_should_create_queue_and_measure_size(self):
         # given
         q = await Queue.create(self.data_path)
