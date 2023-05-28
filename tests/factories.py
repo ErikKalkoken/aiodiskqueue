@@ -5,7 +5,7 @@ import factory
 import factory.fuzzy
 
 
-@dataclass
+@dataclass(frozen=True)
 class Item:
     """An item for testing the queue."""
 

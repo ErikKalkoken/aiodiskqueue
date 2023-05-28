@@ -1,6 +1,6 @@
 """Load testing the Queue.
 
-Runs many producers and 1 consumer in parallel and measures duration and throughput.
+Runs multiple producers and consumers in parallel and measures duration and throughput.
 
 For each item one put and one get is performed = 2 queue operations.
 """
@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 ITEMS_AMOUNT = 5000
 PRODUCER_AMOUNT = 100
+CONSUMER_AMOUNT = 2
+DISKQUEUE_MAXSIZE = 1000
 
 
 def random_string(length: int) -> str:
@@ -38,7 +40,6 @@ async def producer(
             return
         else:
             await disk_queue.put(item)
-            await asyncio.sleep(random.random() / 10)
 
 
 async def consumer(disk_queue: aiodiskqueue.Queue, result_queue: asyncio.Queue):
@@ -52,20 +53,23 @@ async def consumer(disk_queue: aiodiskqueue.Queue, result_queue: asyncio.Queue):
         logger.exception("Consumer error")
 
 
-async def main(db_path):
-    # create source queue with items
-    items = [random_string(16) for _ in range(ITEMS_AMOUNT)]
+async def main(data_path):
+    # create queues
     source_queue = asyncio.Queue()
-    for item in items:
-        source_queue.put_nowait(item)
-
-    # create disk and destination queue
-    disk_queue = await aiodiskqueue.Queue.create(db_path, maxsize=1000)
+    disk_queue = await aiodiskqueue.Queue.create(data_path, maxsize=DISKQUEUE_MAXSIZE)
     result_queue = asyncio.Queue()
+
+    # create source queue with items
+    source_items = {random_string(16) for _ in range(ITEMS_AMOUNT)}
+    for item in source_items:
+        source_queue.put_nowait(item)
 
     # start producer and consumers and wait for producers to finish
     start = time.perf_counter()
-    consumer_task = asyncio.create_task(consumer(disk_queue, result_queue))
+    consumer_tasks = [
+        asyncio.create_task(consumer(disk_queue, result_queue))
+        for _ in range(CONSUMER_AMOUNT)
+    ]
     producers = [
         producer(source_queue, disk_queue, num + 1) for num in range(PRODUCER_AMOUNT)
     ]
@@ -74,23 +78,25 @@ async def main(db_path):
     # wait for consumer to finish
     logger.info("Waiting for consumer to complete...")
     await disk_queue.join()
-    consumer_task.cancel()
+    end = time.perf_counter()
+    for task in consumer_tasks:
+        task.cancel()
 
     # measure duration and throughput
-    duration = time.perf_counter() - start
+    duration = end - start
     throughput = ITEMS_AMOUNT * 2 / duration
     logger.info("Duration: %f seconds, queue ops per sec: %f", duration, throughput)
 
     # compare source items with result items
-    items_2 = []
+    result_items = set()
     while True:
         try:
             item = result_queue.get_nowait()
         except asyncio.QueueEmpty:
             break
         else:
-            items_2.append(item)
-    dif = set(items).difference(set(items_2))
+            result_items.add(item)
+    dif = source_items.difference(result_items)
     if not dif:
         logger.info("OK")
     else:
@@ -100,6 +106,6 @@ async def main(db_path):
     logger.info("Peak size of disk queue was: %d", disk_queue._peak_size)
 
 
-db_path = Path(__file__).parent / "loadtest_queue.dat"
-db_path.unlink(missing_ok=True)
-asyncio.run(main(db_path))
+data_path = Path(__file__).parent / "loadtest_queue.dat"
+data_path.unlink(missing_ok=True)
+asyncio.run(main(data_path))

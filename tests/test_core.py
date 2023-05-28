@@ -70,19 +70,19 @@ class TestQueue(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_should_wait_until_item_is_available(self):
         async def consumer():
-            item = await q.get()
-            await queue_2.put(item)
+            item = await input_queue.get()
+            await result_queue.put(item)
 
         # given
-        queue_2 = asyncio.Queue()
-        q = await Queue.create(self.data_path)
+        input_queue = await Queue.create(self.data_path)
+        result_queue = asyncio.Queue()
         asyncio.create_task(consumer())
         # when
         await asyncio.sleep(1)  # consumer sees an empty queue when task starts
         item = ItemFactory()
-        await q.put_nowait(item)
+        await input_queue.put_nowait(item)
         # then
-        item_new = await queue_2.get()
+        item_new = await result_queue.get()
         self.assertEqual(item_new, item)
 
     async def test_should_create_new_file_when_current_file_is_corrupt(self):

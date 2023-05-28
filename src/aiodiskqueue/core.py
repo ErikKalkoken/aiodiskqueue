@@ -174,7 +174,9 @@ class Queue:
                 self._tasks_are_finished.notify_all()
 
     async def _write_queue(self):
-        async with aiofiles.open(self._data_path, "wb", buffering=0) as fp:
+        async with aiofiles.open(
+            self._data_path, "wb", buffering=0
+        ) as fp:  # buffering is disabled to prevent the unclosed file issue.
             await fp.write(pickle.dumps(self._queue))
         size = self.qsize()
         self._peak_size = max(self._peak_size, size)
