@@ -1,6 +1,7 @@
 import asyncio
 import shutil
 import tempfile
+import tracemalloc
 import unittest
 from pathlib import Path
 
@@ -9,6 +10,8 @@ import aiofiles
 from aiodiskqueue import Queue, QueueEmpty
 
 from .factories import ItemFactory
+
+tracemalloc.start()
 
 
 class TestQueue(unittest.IsolatedAsyncioTestCase):
