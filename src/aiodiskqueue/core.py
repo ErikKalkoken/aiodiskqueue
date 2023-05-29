@@ -170,20 +170,26 @@ class Queue(metaclass=NoDirectInstantiation):
                 self._tasks_are_finished.notify_all()
 
     async def _write_queue(self):
-        async with aiofiles.open(
-            self._data_path, "wb", buffering=0
-        ) as fp:  # buffering is disabled to prevent the unclosed file issue.
-            await fp.write(pickle.dumps(self._queue))
+        await self._write_queue_to_path(self._data_path, self._queue)
         size = self.qsize()
         self._peak_size = max(self._peak_size, size)
         logger.debug("Wrote queue with %d items: %s", size, self._data_path)
 
     @staticmethod
-    async def _read_queue(data_path: Path) -> list:
+    async def _write_queue_to_path(data_path: Path, queue: list):
+        async with aiofiles.open(
+            data_path, "wb", buffering=0
+        ) as fp:  # buffering is disabled to prevent the unclosed file issue.
+            await fp.write(pickle.dumps(queue))
+
+    @classmethod
+    async def _read_queue(cls, data_path: Path) -> list:
         try:
             async with aiofiles.open(data_path, "rb", buffering=0) as fp:
                 data = await fp.read()
         except FileNotFoundError:
+            await cls._write_queue_to_path(data_path, [])  # ensuring early we can write
+            await aiofiles.os.remove(data_path)
             return []
 
         try:
@@ -205,15 +211,15 @@ class Queue(metaclass=NoDirectInstantiation):
 
     @classmethod
     async def create(cls, data_path: Union[str, Path], maxsize: int = 0) -> "Queue":
-        """Create a queue.
+        """Create a new queue instance.
 
-        A new data file will be created at the given path if it does not already exist.
+        A data file will be created at the given path if it does not already exist.
 
         If the data file already exists, if will be used to recreate the queue if possible.
         Should that fail, the existing data file will be backed up and the queue reset.
 
-        Using two different instances with the same data file simultaneously
-        is not recommended as it may lead to data corruption.
+        Please note that using two different instances with the same data file
+        simultaneously is not recommended as it may lead to data corruption.
 
         Args:
             data_path: Path of the data file for this queue. e.g. `queue.dat`
@@ -222,5 +228,7 @@ class Queue(metaclass=NoDirectInstantiation):
                 when the queue reaches maxsize until an item is removed by get().
         """
         data_path = Path(data_path)
+        if data_path.suffix == ".bak":
+            raise ValueError("Invalid file name: .bak suffix is reserved for backups")
         queue = await cls._read_queue(data_path)
         return cls._create(data_path, maxsize, queue)

@@ -27,6 +27,20 @@ class TestCreateQueue(QueueAsyncioTestCase):
         # then
         self.assertEqual(q.maxsize, 0)
 
+    async def test_do_not_allow_data_file_ending_on_bak(self):
+        # given
+        invalid_path = self.data_path.with_name("data.bak")
+        # when/then
+        with self.assertRaises(ValueError):
+            await Queue.create(invalid_path)
+
+    async def test_fail_at_creation_when_data_file_can_not_be_written(self):
+        # given
+        invalid_path = self.data_path.parent / "dead-end" / "queue.dat"
+        # when/then
+        with self.assertRaises(OSError):
+            await Queue.create(invalid_path)
+
     async def test_should_reset_queue_and_backup_data_file_when_not_usable(self):
         # given
         async with aiofiles.open(self.data_path, "wb") as fp:
