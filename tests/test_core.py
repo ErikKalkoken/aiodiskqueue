@@ -1,6 +1,7 @@
 import asyncio
 
 import aiofiles
+import aiofiles.os
 
 from aiodiskqueue import Queue, QueueEmpty, QueueFull
 
@@ -26,26 +27,39 @@ class TestCreateQueue(QueueAsyncioTestCase):
         # then
         self.assertEqual(q.maxsize, 0)
 
-    async def test_should_create_new_file_when_current_file_is_corrupt(self):
+    async def test_should_reset_queue_and_backup_data_file_when_not_usable(self):
         # given
         async with aiofiles.open(self.data_path, "wb") as fp:
             await fp.write(b"invalid-data")
-        q = await Queue.create(self.data_path)
         # when
-        result = q.qsize()
+        q = await Queue.create(self.data_path)
         # then
-        self.assertEqual(result, 0)
+        self.assertEqual(q.qsize(), 0)
+        backup_path = self.data_path.with_suffix(".bak")
+        self.assertTrue(backup_path.exists())
+
+    async def test_should_overwrite_existing_backup(self):
+        # given
+        async with aiofiles.open(self.data_path, "wb") as fp:
+            await fp.write(b"invalid-data")
+        backup_path = self.data_path.with_suffix(".bak")
+        backup_path.touch()
+        # when
+        q = await Queue.create(self.data_path)
+        # then
+        self.assertEqual(q.qsize(), 0)
+        self.assertTrue(backup_path.exists())
 
     async def test_should_preserve_queue_content(self):
         # given
         queue_1 = await Queue.create(self.data_path)
         item = ItemFactory()
         await queue_1.put_nowait(item)
-        # when
         del queue_1
+        # when
         queue_2 = await Queue.create(self.data_path)
-        item_new = await queue_2.get()
         # then
+        item_new = await queue_2.get()
         self.assertEqual(item_new, item)
 
 

@@ -18,16 +18,7 @@ class Queue(metaclass=NoDirectInstantiation):
     """A persistent AsyncIO FIFO queue.
 
     The content of a queue is stored on disk in a data file.
-    This file usually only exists temporarily while there are items in the queue.
-
-    An existing data file is used to recreate a queue,
-    e.g. to preserve the queue content after a process restart
-
-    However, should the data file be corrupted it will be discarded
-    so the queue can continue to function normally.
-
-    Using two different instances with the same data file simultaneously
-    is not recommended as it may lead to data corruption.
+    This file only exists temporarily while there are items in the queue.
 
     This class is not thread safe.
 
@@ -198,11 +189,15 @@ class Queue(metaclass=NoDirectInstantiation):
         try:
             queue = pickle.loads(data)
         except pickle.PickleError:
-            logger.exception("Data file is corrupt. Will be discarded: %s", data_path)
+            backup_path = data_path.with_suffix(".bak")
+            await aiofiles.os.rename(data_path, backup_path)
+            logger.exception(
+                "Data file is corrupt and has been backed up: %s", backup_path
+            )
             return []
 
         logger.info(
-            "Resurrecting queue with %d items from file: %s",
+            "Resurrecting queue with %d items from: %s",
             len(queue),
             data_path,
         )
@@ -211,6 +206,14 @@ class Queue(metaclass=NoDirectInstantiation):
     @classmethod
     async def create(cls, data_path: Union[str, Path], maxsize: int = 0) -> "Queue":
         """Create a queue.
+
+        A new data file will be created at the given path if it does not already exist.
+
+        If the data file already exists, if will be used to recreate the queue if possible.
+        Should that fail, the existing data file will be backed up and the queue reset.
+
+        Using two different instances with the same data file simultaneously
+        is not recommended as it may lead to data corruption.
 
         Args:
             data_path: Path of the data file for this queue. e.g. `queue.dat`
