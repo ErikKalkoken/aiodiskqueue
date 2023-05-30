@@ -4,7 +4,7 @@ import io
 import logging
 import pickle
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 import aiofiles
 import aiofiles.os
@@ -13,6 +13,55 @@ from aiodiskqueue.exceptions import QueueEmpty, QueueFull
 from aiodiskqueue.utils import NoDirectInstantiation
 
 logger = logging.getLogger(__name__)
+
+
+class StorageEngine:
+    def __init__(self, data_path: Path) -> None:
+        self._data_path = data_path
+
+    async def write_objs_to_file(self, items: list):
+        with io.BytesIO() as buffer:
+            for item in items:
+                pickle.dump(item, buffer)
+            buffer.seek(0)
+            data = buffer.read()
+        async with aiofiles.open(self._data_path, "wb", buffering=0) as f:
+            await f.write(data)
+
+    async def append_item_to_file(self, item: Any):
+        async with aiofiles.open(self._data_path, "ab", buffering=0) as fp:
+            await fp.write(pickle.dumps(item))
+
+    async def read_items_from_file(self) -> list:
+        try:
+            async with aiofiles.open(self._data_path, "rb", buffering=0) as f:
+                pickled_bytes = await f.read()
+        except FileNotFoundError:
+            return []
+
+        items = []
+        with io.BytesIO() as buffer:
+            buffer.write(pickled_bytes)
+            buffer.seek(0)
+            while True:
+                try:
+                    item = pickle.load(buffer)
+                except EOFError:
+                    break
+                except pickle.PickleError:
+                    backup_path = self._data_path.with_suffix(".bak")
+                    await aiofiles.os.rename(self._data_path, backup_path)
+                    logger.exception(
+                        "Data file is corrupt and has been backed up: %s", backup_path
+                    )
+                    return []
+                else:
+                    items.append(item)
+
+        logger.info(
+            "Fetching %d items from existing data file: %s", len(items), self._data_path
+        )
+        return items
 
 
 class Queue(metaclass=NoDirectInstantiation):
@@ -26,7 +75,13 @@ class Queue(metaclass=NoDirectInstantiation):
     To create a new object the factory method :func:`create` must be used.
     """
 
-    def __init__(self, data_path: Path, maxsize: int, queue: list) -> None:
+    def __init__(
+        self,
+        data_path: Path,
+        maxsize: int,
+        queue: list,
+        storage_engine: StorageEngine,
+    ) -> None:
         """Direct instantiation would break the persistance feature
         and has therefore been disabled.
 
@@ -41,6 +96,7 @@ class Queue(metaclass=NoDirectInstantiation):
         self._unfinished_tasks = 0
         self._peak_size = len(queue)  # measuring peak size of the queue
         self._queue = list(queue)
+        self._storage_engine = storage_engine
 
     @property
     def maxsize(self) -> int:
@@ -134,7 +190,7 @@ class Queue(metaclass=NoDirectInstantiation):
             if self._maxsize and self.qsize() >= self._maxsize:
                 raise QueueFull
             self._queue.append(item)
-            await self._append_item_to_file(self._data_path, item)
+            await self._storage_engine.append_item_to_file(item)
             async with self._tasks_are_finished:
                 self._unfinished_tasks += 1
 
@@ -171,60 +227,18 @@ class Queue(metaclass=NoDirectInstantiation):
                 self._tasks_are_finished.notify_all()
 
     async def _write_queue(self):
-        await self._write_objs_to_file(self._data_path, self._queue)
+        await self._storage_engine.write_objs_to_file(self._queue)
         size = self.qsize()
         self._peak_size = max(self._peak_size, size)
         logger.debug("Wrote queue with %d items: %s", size, self._data_path)
 
-    @staticmethod
-    async def _write_objs_to_file(data_path: Path, items: list):
-        with io.BytesIO() as buffer:
-            for item in items:
-                pickle.dump(item, buffer)
-            buffer.seek(0)
-            data = buffer.read()
-        async with aiofiles.open(data_path, "wb", buffering=0) as f:
-            await f.write(data)
-
-    @staticmethod
-    async def _append_item_to_file(data_path: Path, item: Any):
-        async with aiofiles.open(data_path, "ab", buffering=0) as fp:
-            await fp.write(pickle.dumps(item))
-
     @classmethod
-    async def _read_items_from_file(cls, data_path: Path) -> list:
-        try:
-            async with aiofiles.open(data_path, "rb", buffering=0) as f:
-                pickled_bytes = await f.read()
-        except FileNotFoundError:
-            return []
-
-        items = []
-        with io.BytesIO() as buffer:
-            buffer.write(pickled_bytes)
-            buffer.seek(0)
-            while True:
-                try:
-                    item = pickle.load(buffer)
-                except EOFError:
-                    break
-                except pickle.PickleError:
-                    backup_path = data_path.with_suffix(".bak")
-                    await aiofiles.os.rename(data_path, backup_path)
-                    logger.exception(
-                        "Data file is corrupt and has been backed up: %s", backup_path
-                    )
-                    return []
-                else:
-                    items.append(item)
-
-        logger.info(
-            "Fetching %d items from existing data file: %s", len(items), data_path
-        )
-        return items
-
-    @classmethod
-    async def create(cls, data_path: Union[str, Path], maxsize: int = 0) -> "Queue":
+    async def create(
+        cls,
+        data_path: Union[str, Path],
+        maxsize: int = 0,
+        storage_engine: Optional[StorageEngine] = None,
+    ) -> "Queue":
         """Create a new queue instance.
 
         A data file will be created at the given path if it does not already exist.
@@ -244,9 +258,11 @@ class Queue(metaclass=NoDirectInstantiation):
         data_path = Path(data_path)
         if data_path.suffix == ".bak":
             raise ValueError("Invalid file name: .bak suffix is reserved for backups")
-        queue = await cls._read_items_from_file(data_path)
+        if not storage_engine:
+            storage_engine = StorageEngine(data_path)
+        queue = await storage_engine.read_items_from_file()
         if not queue:
-            await cls._write_objs_to_file(data_path, [])  # ensuring early we can write
+            await storage_engine.write_objs_to_file([])  # ensuring early we can write
             await aiofiles.os.remove(data_path)
 
-        return cls._create(data_path, maxsize, queue)
+        return cls._create(data_path, maxsize, queue, storage_engine)
