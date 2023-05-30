@@ -125,19 +125,25 @@ async def runner(
 
     # create source queue with items
     source_items = {random_string(16) for _ in range(items_count)}
-    for item in source_items:
-        source_queue.put_nowait(item)
+
+    if producer_count:
+        for item in source_items:
+            source_queue.put_nowait(item)
+    else:
+        for item in source_items:
+            await disk_queue.put_nowait(item)
 
     # starting measurement
     consumer_tasks = [
         asyncio.create_task(consumer(disk_queue, result_queue))
         for _ in range(consumer_count)
     ]
-    start = time.perf_counter()
     producers = [
         producer(source_queue, disk_queue, num + 1) for num in range(producer_count)
     ]
-    await asyncio.gather(*producers)
+    start = time.perf_counter()
+    if producers:
+        await asyncio.gather(*producers)
 
     # wait for consumer to finish
     if consumer_tasks:
@@ -163,7 +169,7 @@ async def runner(
         "consumers": consumer_count,
         "peak_size": disk_queue._peak_size,
         "profile": profile_name,
-        "storage_engine": cls_storage_engine.__name__,
+        "storage_engine": type(disk_queue._storage_engine).__name__,
         "throughput": throughput,
     }
     obj = Measurement(**data)
@@ -172,9 +178,9 @@ async def runner(
 
 async def start(data_path: Path, config: dict, run: int):
     timestamp = dt.datetime.now(tz=dt.timezone.utc)
-    for cls_storage_engine in [aiodiskqueue.PickledList, aiodiskqueue.PickleSequence]:
+    for cls_storage_engine in [aiodiskqueue.PickleSequence, aiodiskqueue.PickledList]:
         for profile in config["profiles"]:
-            for item_count in profile["items"]:
+            for item_count in config["common"]["items"]:
                 await runner(
                     data_path,
                     item_count,

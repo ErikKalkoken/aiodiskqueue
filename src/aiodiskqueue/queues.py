@@ -217,10 +217,11 @@ class Queue(metaclass=NoDirectInstantiation):
         if data_path.suffix == ".bak":
             raise ValueError("Invalid file name: .bak suffix is reserved for backups")
 
-        if cls_storage_engine and not issubclass(cls_storage_engine, _StorageEngine):
-            raise TypeError("Invalid storage engine")
-        else:
+        if not cls_storage_engine:
             cls_storage_engine = PickleSequence
+        else:
+            if not issubclass(cls_storage_engine, _StorageEngine):
+                raise TypeError("Invalid storage engine")
         storage_engine = cls_storage_engine(data_path)
         queue = await storage_engine.read_items_from_file()
         if not queue:

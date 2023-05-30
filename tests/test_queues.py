@@ -4,6 +4,7 @@ import aiofiles
 import aiofiles.os
 
 from aiodiskqueue import Queue, QueueEmpty, QueueFull
+from aiodiskqueue.engines import PickledList, PickleSequence
 
 from .factories import ItemFactory
 from .helpers import QueueAsyncioTestCase
@@ -75,6 +76,23 @@ class TestCreateQueue(QueueAsyncioTestCase):
         # then
         item_new = await queue_2.get()
         self.assertEqual(item_new, item)
+
+    async def test_should_create_queue_with_storage_engine_1(self):
+        # given
+        q = await Queue.create(self.data_path, cls_storage_engine=PickleSequence)
+        # when/then
+        self.assertIsInstance(q._storage_engine, PickleSequence)
+
+    async def test_should_create_queue_with_storage_engine_2(self):
+        # given
+        q = await Queue.create(self.data_path, cls_storage_engine=PickledList)
+        # when/then
+        self.assertIsInstance(q._storage_engine, PickledList)
+
+    async def test_should_raise_error_when_storage_engine_not_valid(self):
+        # when/then
+        with self.assertRaises(TypeError):
+            await Queue.create(self.data_path, cls_storage_engine=str)
 
 
 class TestPutIntoQueue(QueueAsyncioTestCase):
