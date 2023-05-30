@@ -134,7 +134,7 @@ class Queue(metaclass=NoDirectInstantiation):
             if self._maxsize and self.qsize() >= self._maxsize:
                 raise QueueFull
             self._queue.append(item)
-            await self._add_obj_to_path(self._data_path, item)
+            await self._append_item_to_file(self._data_path, item)
             async with self._tasks_are_finished:
                 self._unfinished_tasks += 1
 
@@ -171,43 +171,41 @@ class Queue(metaclass=NoDirectInstantiation):
                 self._tasks_are_finished.notify_all()
 
     async def _write_queue(self):
-        await self._write_queue_to_path(self._data_path, self._queue)
+        await self._write_objs_to_file(self._data_path, self._queue)
         size = self.qsize()
         self._peak_size = max(self._peak_size, size)
         logger.debug("Wrote queue with %d items: %s", size, self._data_path)
 
     @staticmethod
-    async def _write_queue_to_path(data_path: Path, queue: list):
+    async def _write_objs_to_file(data_path: Path, items: list):
         with io.BytesIO() as buffer:
-            for obj in queue:
-                pickle.dump(obj, buffer)
+            for item in items:
+                pickle.dump(item, buffer)
             buffer.seek(0)
             data = buffer.read()
         async with aiofiles.open(data_path, "wb", buffering=0) as f:
             await f.write(data)
 
     @staticmethod
-    async def _add_obj_to_path(data_path: Path, obj: Any):
+    async def _append_item_to_file(data_path: Path, item: Any):
         async with aiofiles.open(data_path, "ab", buffering=0) as fp:
-            await fp.write(pickle.dumps(obj))
+            await fp.write(pickle.dumps(item))
 
     @classmethod
-    async def _read_queue(cls, data_path: Path) -> list:
+    async def _read_items_from_file(cls, data_path: Path) -> list:
         try:
             async with aiofiles.open(data_path, "rb", buffering=0) as f:
                 pickled_bytes = await f.read()
         except FileNotFoundError:
-            await cls._write_queue_to_path(data_path, [])  # ensuring early we can write
-            await aiofiles.os.remove(data_path)
             return []
 
-        objs = []
+        items = []
         with io.BytesIO() as buffer:
             buffer.write(pickled_bytes)
             buffer.seek(0)
             while True:
                 try:
-                    obj = pickle.load(buffer)
+                    item = pickle.load(buffer)
                 except EOFError:
                     break
                 except pickle.PickleError:
@@ -218,14 +216,12 @@ class Queue(metaclass=NoDirectInstantiation):
                     )
                     return []
                 else:
-                    objs.append(obj)
+                    items.append(item)
 
         logger.info(
-            "Resurrecting queue with %d items from: %s",
-            len(objs),
-            data_path,
+            "Fetching %d items from existing data file: %s", len(items), data_path
         )
-        return objs
+        return items
 
     @classmethod
     async def create(cls, data_path: Union[str, Path], maxsize: int = 0) -> "Queue":
@@ -248,5 +244,9 @@ class Queue(metaclass=NoDirectInstantiation):
         data_path = Path(data_path)
         if data_path.suffix == ".bak":
             raise ValueError("Invalid file name: .bak suffix is reserved for backups")
-        queue = await cls._read_queue(data_path)
+        queue = await cls._read_items_from_file(data_path)
+        if not queue:
+            await cls._write_objs_to_file(data_path, [])  # ensuring early we can write
+            await aiofiles.os.remove(data_path)
+
         return cls._create(data_path, maxsize, queue)

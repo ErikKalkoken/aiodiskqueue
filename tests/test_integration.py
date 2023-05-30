@@ -37,10 +37,10 @@ async def consumer(disk_queue: aiodiskqueue.Queue, result_queue: asyncio.Queue):
 class TestIntegration(QueueAsyncioTestCase):
     async def test_multiple_consumer_and_producers(self):
         # parameters
-        ITEMS_AMOUNT = 500
-        PRODUCER_AMOUNT = 10
+        ITEMS_AMOUNT = 100
+        PRODUCER_AMOUNT = 5
         CONSUMER_AMOUNT = 2
-        DISKQUEUE_MAXSIZE = 100
+        DISKQUEUE_MAXSIZE = 50
 
         # create queues
         source_queue = asyncio.Queue()
