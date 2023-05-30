@@ -28,21 +28,21 @@ class _StorageEngine(ABC):
         """
 
     @abstractmethod
-    async def read_items_from_file(self) -> List[Any]:  # type: ignore
-        """Read items from data file.
+    async def load_all_items(self) -> List[Any]:  # type: ignore
+        """Load all items from data file.
 
         :meta private:
         """
 
     @abstractmethod
-    async def write_objs_to_file(self, items: List[Any]):
-        """Overwrite data file with new items.
+    async def save_all_items(self, items: List[Any]):
+        """Saves all items to data file.
 
         :meta private:
         """
 
-    async def append_item_to_file(self, item: Any):
-        """Append item to data file.
+    async def append_item(self, item: Any):
+        """Append one item to data file.
 
         :meta private:
         """
@@ -56,7 +56,7 @@ class PickledList(_StorageEngine):
     def can_append(self) -> bool:
         return False
 
-    async def read_items_from_file(self) -> List[Any]:
+    async def load_all_items(self) -> List[Any]:
         try:
             async with aiofiles.open(self._data_path, "rb", buffering=0) as file:
                 data = await file.read()
@@ -75,7 +75,7 @@ class PickledList(_StorageEngine):
 
         return queue
 
-    async def write_objs_to_file(self, items: Iterable[Any]):
+    async def save_all_items(self, items: Iterable[Any]):
         async with aiofiles.open(self._data_path, "wb", buffering=0) as file:
             await file.write(pickle.dumps(items))
 
@@ -87,7 +87,7 @@ class PickleSequence(_StorageEngine):
     def can_append(self) -> bool:
         return True
 
-    async def read_items_from_file(self) -> List[Any]:
+    async def load_all_items(self) -> List[Any]:
         try:
             async with aiofiles.open(self._data_path, "rb", buffering=0) as file:
                 pickled_bytes = await file.read()
@@ -114,7 +114,7 @@ class PickleSequence(_StorageEngine):
                     items.append(item)
         return items
 
-    async def write_objs_to_file(self, items: Iterable[Any]):
+    async def save_all_items(self, items: Iterable[Any]):
         with io.BytesIO() as buffer:
             for item in items:
                 pickle.dump(item, buffer)
@@ -123,6 +123,6 @@ class PickleSequence(_StorageEngine):
         async with aiofiles.open(self._data_path, "wb", buffering=0) as file:
             await file.write(data)
 
-    async def append_item_to_file(self, item: Any):
+    async def append_item(self, item: Any):
         async with aiofiles.open(self._data_path, "ab", buffering=0) as file:
             await file.write(pickle.dumps(item))

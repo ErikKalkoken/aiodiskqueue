@@ -142,9 +142,9 @@ class Queue(metaclass=NoDirectInstantiation):
                 raise QueueFull
             self._queue.append(item)
             if self._storage_engine.can_append:
-                await self._storage_engine.append_item_to_file(item)
+                await self._storage_engine.append_item(item)
             else:
-                await self._storage_engine.write_objs_to_file(self._queue)
+                await self._storage_engine.save_all_items(self._queue)
             async with self._tasks_are_finished:
                 self._unfinished_tasks += 1
 
@@ -181,7 +181,7 @@ class Queue(metaclass=NoDirectInstantiation):
                 self._tasks_are_finished.notify_all()
 
     async def _write_queue(self):
-        await self._storage_engine.write_objs_to_file(self._queue)
+        await self._storage_engine.save_all_items(self._queue)
         size = self.qsize()
         self._peak_size = max(self._peak_size, size)
         logger.debug("Wrote queue with %d items: %s", size, self._data_path)
@@ -223,9 +223,9 @@ class Queue(metaclass=NoDirectInstantiation):
             if not issubclass(cls_storage_engine, _StorageEngine):
                 raise TypeError("Invalid storage engine")
         storage_engine = cls_storage_engine(data_path)
-        queue = await storage_engine.read_items_from_file()
+        queue = await storage_engine.load_all_items()
         if not queue:
-            await storage_engine.write_objs_to_file([])  # ensuring early we can write
+            await storage_engine.save_all_items([])  # ensuring early we can write
             await aiofiles.os.remove(data_path)
         else:
             logger.info(
