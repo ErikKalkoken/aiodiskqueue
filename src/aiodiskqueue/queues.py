@@ -1,8 +1,9 @@
 """Core implementation of a persistent AsyncIO queue."""
+
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Type, Union
+from typing import Any, Union
 
 import aiofiles
 import aiofiles.os
@@ -190,30 +191,36 @@ class Queue(metaclass=NoDirectInstantiation):
         cls,
         data_path: Union[str, Path],
         maxsize: int = 0,
-        cls_storage_engine: Type[_StorageEngine] = PickleSequence,
+        cls_storage_engine=None,
     ) -> "Queue":
         """Create a new queue instance.
 
         A data file will be created at the given path if it does not already exist.
 
-        If the data file already exists, if will be used to recreate the queue if possible.
-        Should that fail, the existing data file will be backed up and the queue reset.
+        If the data file already exists, if will be used to recreate the queue
+        if possible. Should that fail, the existing data file will be backed up
+        and the queue reset.
 
         Please note that using two different instances with the same data file
         simultaneously is not recommended as it may lead to data corruption.
 
         Args:
             data_path: Path of the data file for this queue. e.g. `queue.dat`
-            maxsize: If maxsize is less than or equal to zero, the queue size is infinite.
+            maxsize: If maxsize is less than or equal to zero,
+                the queue size is infinite.
                 If it is an integer greater than 0, then put() blocks
                 when the queue reaches maxsize until an item is removed by get().
+            cls_storage_engine: Define the storage engine to be used.
+                Default is :class:`.PickleSequence`.
         """
         data_path = Path(data_path)
         if data_path.suffix == ".bak":
             raise ValueError("Invalid file name: .bak suffix is reserved for backups")
 
-        if not issubclass(cls_storage_engine, _StorageEngine):
+        if cls_storage_engine and not issubclass(cls_storage_engine, _StorageEngine):
             raise TypeError("Invalid storage engine")
+        else:
+            cls_storage_engine = PickleSequence
         storage_engine = cls_storage_engine(data_path)
         queue = await storage_engine.read_items_from_file()
         if not queue:

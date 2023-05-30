@@ -8,15 +8,14 @@ API Reference
 Queues
 ======
 
-.. automodule:: aiodiskqueue.core
-
-Storage Engines
-===============
-
-.. automodule:: aiodiskqueue.engines
-
+.. automodule:: aiodiskqueue.queues
 
 Exceptions
 ==========
 
 .. automodule:: aiodiskqueue.exceptions
+
+Storage Engines
+===============
+
+.. automodule:: aiodiskqueue.engines

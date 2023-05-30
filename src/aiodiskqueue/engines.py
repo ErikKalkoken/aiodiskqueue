@@ -1,3 +1,5 @@
+"""Engines for storing the queues on disk."""
+
 import io
 import logging
 import pickle
