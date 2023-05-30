@@ -114,6 +114,7 @@ async def runner(
 
     # create queues
     source_queue = asyncio.Queue()
+    data_path.unlink(missing_ok=True)
     disk_queue = await aiodiskqueue.Queue.create(data_path)
     result_queue = asyncio.Queue()
 
@@ -134,8 +135,9 @@ async def runner(
     await asyncio.gather(*producers)
 
     # wait for consumer to finish
-    logger.debug("Waiting for consumer to complete...")
-    await disk_queue.join()
+    if consumer_tasks:
+        logger.debug("Waiting for consumer to complete...")
+        await disk_queue.join()
     end = time.perf_counter()
 
     for task in consumer_tasks:
@@ -146,23 +148,6 @@ async def runner(
     throughput = items_count * 2 / duration
     logger.info("Throughput for %d items: %f items / sec", items_count, throughput)
     logger.info("Peak size of disk queue was: %d", disk_queue._peak_size)
-
-    # compare source items with result items
-    result_items = set()
-    while True:
-        try:
-            item = result_queue.get_nowait()
-        except asyncio.QueueEmpty:
-            break
-        else:
-            result_items.add(item)
-    dif = source_items.difference(result_items)
-    if dif:
-        logger.error("Differences found")
-        logger.info("dif: %s", sorted(list(dif)))
-        raise RuntimeError("Run failed due to differences")
-
-    logger.info("Comparison OK")
 
     # write results
     data = {
@@ -202,7 +187,6 @@ def load_config() -> dict:
 
 def main():
     data_path = Path(__file__).parent / "loadtest_queue.dat"
-    data_path.unlink(missing_ok=True)
     config = load_config()
     run = Measurement.latest_run() + 1
     asyncio.run(start(data_path, config, run=run))

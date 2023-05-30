@@ -1,5 +1,6 @@
 """Core implementation of a persistent AsyncIO queue."""
 import asyncio
+import io
 import logging
 import pickle
 from pathlib import Path
@@ -133,7 +134,7 @@ class Queue(metaclass=NoDirectInstantiation):
             if self._maxsize and self.qsize() >= self._maxsize:
                 raise QueueFull
             self._queue.append(item)
-            await self._write_queue()
+            await self._add_obj_to_path(self._data_path, item)
             async with self._tasks_are_finished:
                 self._unfinished_tasks += 1
 
@@ -177,37 +178,54 @@ class Queue(metaclass=NoDirectInstantiation):
 
     @staticmethod
     async def _write_queue_to_path(data_path: Path, queue: list):
-        async with aiofiles.open(
-            data_path, "wb", buffering=0
-        ) as fp:  # buffering is disabled to prevent the unclosed file issue.
-            await fp.write(pickle.dumps(queue))
+        with io.BytesIO() as buffer:
+            for obj in queue:
+                pickle.dump(obj, buffer)
+            buffer.seek(0)
+            data = buffer.read()
+        async with aiofiles.open(data_path, "wb", buffering=0) as f:
+            await f.write(data)
+
+    @staticmethod
+    async def _add_obj_to_path(data_path: Path, obj: Any):
+        async with aiofiles.open(data_path, "ab", buffering=0) as fp:
+            await fp.write(pickle.dumps(obj))
 
     @classmethod
     async def _read_queue(cls, data_path: Path) -> list:
         try:
-            async with aiofiles.open(data_path, "rb", buffering=0) as fp:
-                data = await fp.read()
+            async with aiofiles.open(data_path, "rb", buffering=0) as f:
+                pickled_bytes = await f.read()
         except FileNotFoundError:
             await cls._write_queue_to_path(data_path, [])  # ensuring early we can write
             await aiofiles.os.remove(data_path)
             return []
 
-        try:
-            queue = pickle.loads(data)
-        except pickle.PickleError:
-            backup_path = data_path.with_suffix(".bak")
-            await aiofiles.os.rename(data_path, backup_path)
-            logger.exception(
-                "Data file is corrupt and has been backed up: %s", backup_path
-            )
-            return []
+        objs = []
+        with io.BytesIO() as buffer:
+            buffer.write(pickled_bytes)
+            buffer.seek(0)
+            while True:
+                try:
+                    obj = pickle.load(buffer)
+                except EOFError:
+                    break
+                except pickle.PickleError:
+                    backup_path = data_path.with_suffix(".bak")
+                    await aiofiles.os.rename(data_path, backup_path)
+                    logger.exception(
+                        "Data file is corrupt and has been backed up: %s", backup_path
+                    )
+                    return []
+                else:
+                    objs.append(obj)
 
         logger.info(
             "Resurrecting queue with %d items from: %s",
-            len(queue),
+            len(objs),
             data_path,
         )
-        return queue
+        return objs
 
     @classmethod
     async def create(cls, data_path: Union[str, Path], maxsize: int = 0) -> "Queue":

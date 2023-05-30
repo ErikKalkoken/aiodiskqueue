@@ -1,11 +1,17 @@
 [[profiles]]
 name = "minimum"
-items = [100, 1000, 5000, 10000]
+items = [100, 1000, 5000, 10000, 20000]
 producers = 1
 consumers = 1
 
 [[profiles]]
 name = "medium"
-items = [100, 1000, 5000, 10000]
+items = [100, 1000, 5000, 10000, 20000]
 producers = 5
 consumers = 1
+
+[[profiles]]
+name = "producers"
+items = [100, 1000, 5000, 10000, 20000]
+producers = 5
+consumers = 0
