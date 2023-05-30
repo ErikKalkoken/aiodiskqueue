@@ -3,8 +3,9 @@ import asyncio
 import io
 import logging
 import pickle
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 import aiofiles
 import aiofiles.os
@@ -15,24 +16,72 @@ from aiodiskqueue.utils import NoDirectInstantiation
 logger = logging.getLogger(__name__)
 
 
-class StorageEngine:
+class StorageEngine(ABC):
+    """Base class for all storage engines."""
+
     def __init__(self, data_path: Path) -> None:
         self._data_path = data_path
 
-    async def write_objs_to_file(self, items: list):
-        with io.BytesIO() as buffer:
-            for item in items:
-                pickle.dump(item, buffer)
-            buffer.seek(0)
-            data = buffer.read()
-        async with aiofiles.open(self._data_path, "wb", buffering=0) as f:
-            await f.write(data)
+    @property
+    @abstractmethod
+    def can_append(self) -> bool:  # type: ignore
+        """Can append items to data file."""
+        pass
+
+    @abstractmethod
+    async def read_items_from_file(self) -> List[Any]:  # type: ignore
+        """Read items from data file."""
+        pass
+
+    @abstractmethod
+    async def write_objs_to_file(self, items: List[Any]):
+        """Overwrite data file with new items."""
+        pass
 
     async def append_item_to_file(self, item: Any):
-        async with aiofiles.open(self._data_path, "ab", buffering=0) as fp:
-            await fp.write(pickle.dumps(item))
+        """Append item to data file."""
+        raise NotImplementedError()
 
-    async def read_items_from_file(self) -> list:
+
+class PickledList(StorageEngine):
+    """This engine stored items as one singular pickled list of items."""
+
+    @property
+    def can_append(self) -> bool:
+        return False
+
+    async def read_items_from_file(self) -> List[Any]:
+        try:
+            async with aiofiles.open(self._data_path, "rb", buffering=0) as fp:
+                data = await fp.read()
+        except FileNotFoundError:
+            return []
+
+        try:
+            queue = pickle.loads(data)
+        except pickle.PickleError:
+            backup_path = self._data_path.with_suffix(".bak")
+            await aiofiles.os.rename(self._data_path, backup_path)
+            logger.exception(
+                "Data file is corrupt and has been backed up: %s", backup_path
+            )
+            return []
+
+        return queue
+
+    async def write_objs_to_file(self, items: List[Any]):
+        async with aiofiles.open(self._data_path, "wb", buffering=0) as fp:
+            await fp.write(pickle.dumps(items))
+
+
+class PickleSequence(StorageEngine):
+    """This engine stores items as a sequence of single pickles."""
+
+    @property
+    def can_append(self) -> bool:
+        return True
+
+    async def read_items_from_file(self) -> List[Any]:
         try:
             async with aiofiles.open(self._data_path, "rb", buffering=0) as f:
                 pickled_bytes = await f.read()
@@ -57,11 +106,20 @@ class StorageEngine:
                     return []
                 else:
                     items.append(item)
-
-        logger.info(
-            "Fetching %d items from existing data file: %s", len(items), self._data_path
-        )
         return items
+
+    async def write_objs_to_file(self, items: List[Any]):
+        with io.BytesIO() as buffer:
+            for item in items:
+                pickle.dump(item, buffer)
+            buffer.seek(0)
+            data = buffer.read()
+        async with aiofiles.open(self._data_path, "wb", buffering=0) as f:
+            await f.write(data)
+
+    async def append_item_to_file(self, item: Any):
+        async with aiofiles.open(self._data_path, "ab", buffering=0) as fp:
+            await fp.write(pickle.dumps(item))
 
 
 class Queue(metaclass=NoDirectInstantiation):
@@ -190,7 +248,10 @@ class Queue(metaclass=NoDirectInstantiation):
             if self._maxsize and self.qsize() >= self._maxsize:
                 raise QueueFull
             self._queue.append(item)
-            await self._storage_engine.append_item_to_file(item)
+            if self._storage_engine.can_append:
+                await self._storage_engine.append_item_to_file(item)
+            else:
+                await self._storage_engine.write_objs_to_file(self._queue)
             async with self._tasks_are_finished:
                 self._unfinished_tasks += 1
 
@@ -258,11 +319,17 @@ class Queue(metaclass=NoDirectInstantiation):
         data_path = Path(data_path)
         if data_path.suffix == ".bak":
             raise ValueError("Invalid file name: .bak suffix is reserved for backups")
-        if not storage_engine:
-            storage_engine = StorageEngine(data_path)
-        queue = await storage_engine.read_items_from_file()
-        if not queue:
-            await storage_engine.write_objs_to_file([])  # ensuring early we can write
-            await aiofiles.os.remove(data_path)
 
-        return cls._create(data_path, maxsize, queue, storage_engine)
+        my_storage_engine = storage_engine if storage_engine else PickledList(data_path)
+        queue = await my_storage_engine.read_items_from_file()
+        if not queue:
+            await my_storage_engine.write_objs_to_file(
+                []
+            )  # ensuring early we can write
+            await aiofiles.os.remove(data_path)
+        else:
+            logger.info(
+                "Read %d items from existing data file: %s", len(queue), data_path
+            )
+
+        return cls._create(data_path, maxsize, queue, my_storage_engine)
