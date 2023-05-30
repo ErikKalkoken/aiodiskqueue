@@ -5,7 +5,7 @@ import logging
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, Iterable, List, Type, Union
 
 import aiofiles
 import aiofiles.os
@@ -16,7 +16,7 @@ from aiodiskqueue.utils import NoDirectInstantiation
 logger = logging.getLogger(__name__)
 
 
-class StorageEngine(ABC):
+class _StorageEngine(ABC):
     """Base class for all storage engines."""
 
     def __init__(self, data_path: Path) -> None:
@@ -25,25 +25,34 @@ class StorageEngine(ABC):
     @property
     @abstractmethod
     def can_append(self) -> bool:  # type: ignore
-        """Can append items to data file."""
-        pass
+        """Can append items to data file.
+
+        :meta private:
+        """
 
     @abstractmethod
     async def read_items_from_file(self) -> List[Any]:  # type: ignore
-        """Read items from data file."""
-        pass
+        """Read items from data file.
+
+        :meta private:
+        """
 
     @abstractmethod
     async def write_objs_to_file(self, items: List[Any]):
-        """Overwrite data file with new items."""
-        pass
+        """Overwrite data file with new items.
+
+        :meta private:
+        """
 
     async def append_item_to_file(self, item: Any):
-        """Append item to data file."""
+        """Append item to data file.
+
+        :meta private:
+        """
         raise NotImplementedError()
 
 
-class PickledList(StorageEngine):
+class PickledList(_StorageEngine):
     """This engine stored items as one singular pickled list of items."""
 
     @property
@@ -52,8 +61,8 @@ class PickledList(StorageEngine):
 
     async def read_items_from_file(self) -> List[Any]:
         try:
-            async with aiofiles.open(self._data_path, "rb", buffering=0) as fp:
-                data = await fp.read()
+            async with aiofiles.open(self._data_path, "rb", buffering=0) as file:
+                data = await file.read()
         except FileNotFoundError:
             return []
 
@@ -69,12 +78,12 @@ class PickledList(StorageEngine):
 
         return queue
 
-    async def write_objs_to_file(self, items: List[Any]):
-        async with aiofiles.open(self._data_path, "wb", buffering=0) as fp:
-            await fp.write(pickle.dumps(items))
+    async def write_objs_to_file(self, items: Iterable[Any]):
+        async with aiofiles.open(self._data_path, "wb", buffering=0) as file:
+            await file.write(pickle.dumps(items))
 
 
-class PickleSequence(StorageEngine):
+class PickleSequence(_StorageEngine):
     """This engine stores items as a sequence of single pickles."""
 
     @property
@@ -83,8 +92,8 @@ class PickleSequence(StorageEngine):
 
     async def read_items_from_file(self) -> List[Any]:
         try:
-            async with aiofiles.open(self._data_path, "rb", buffering=0) as f:
-                pickled_bytes = await f.read()
+            async with aiofiles.open(self._data_path, "rb", buffering=0) as file:
+                pickled_bytes = await file.read()
         except FileNotFoundError:
             return []
 
@@ -108,18 +117,18 @@ class PickleSequence(StorageEngine):
                     items.append(item)
         return items
 
-    async def write_objs_to_file(self, items: List[Any]):
+    async def write_objs_to_file(self, items: Iterable[Any]):
         with io.BytesIO() as buffer:
             for item in items:
                 pickle.dump(item, buffer)
             buffer.seek(0)
             data = buffer.read()
-        async with aiofiles.open(self._data_path, "wb", buffering=0) as f:
-            await f.write(data)
+        async with aiofiles.open(self._data_path, "wb", buffering=0) as file:
+            await file.write(data)
 
     async def append_item_to_file(self, item: Any):
-        async with aiofiles.open(self._data_path, "ab", buffering=0) as fp:
-            await fp.write(pickle.dumps(item))
+        async with aiofiles.open(self._data_path, "ab", buffering=0) as file:
+            await file.write(pickle.dumps(item))
 
 
 class Queue(metaclass=NoDirectInstantiation):
@@ -138,7 +147,7 @@ class Queue(metaclass=NoDirectInstantiation):
         data_path: Path,
         maxsize: int,
         queue: list,
-        storage_engine: StorageEngine,
+        storage_engine: _StorageEngine,
     ) -> None:
         """Direct instantiation would break the persistance feature
         and has therefore been disabled.
@@ -298,7 +307,7 @@ class Queue(metaclass=NoDirectInstantiation):
         cls,
         data_path: Union[str, Path],
         maxsize: int = 0,
-        storage_engine: Optional[StorageEngine] = None,
+        cls_storage_engine: Type[_StorageEngine] = PickleSequence,
     ) -> "Queue":
         """Create a new queue instance.
 
@@ -320,16 +329,16 @@ class Queue(metaclass=NoDirectInstantiation):
         if data_path.suffix == ".bak":
             raise ValueError("Invalid file name: .bak suffix is reserved for backups")
 
-        my_storage_engine = storage_engine if storage_engine else PickledList(data_path)
-        queue = await my_storage_engine.read_items_from_file()
+        if not issubclass(cls_storage_engine, _StorageEngine):
+            raise TypeError("Invalid storage engine")
+        storage_engine = cls_storage_engine(data_path)
+        queue = await storage_engine.read_items_from_file()
         if not queue:
-            await my_storage_engine.write_objs_to_file(
-                []
-            )  # ensuring early we can write
+            await storage_engine.write_objs_to_file([])  # ensuring early we can write
             await aiofiles.os.remove(data_path)
         else:
             logger.info(
                 "Read %d items from existing data file: %s", len(queue), data_path
             )
 
-        return cls._create(data_path, maxsize, queue, my_storage_engine)
+        return cls._create(data_path, maxsize, queue, storage_engine)

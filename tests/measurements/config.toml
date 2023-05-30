@@ -4,17 +4,17 @@ items = [100, 1000, 5000, 10000, 20000]
 producers = 1
 consumers = 1
 
-[[profiles]]
-name = "medium"
-items = [100, 1000, 5000, 10000, 20000]
-producers = 5
-consumers = 1
+# [[profiles]]
+# name = "medium"
+# items = [100, 1000, 5000, 10000, 20000]
+# producers = 5
+# consumers = 1
 
-[[profiles]]
-name = "heavy"
-items = [100, 1000, 5000, 10000, 20000]
-producers = 20
-consumers = 2
+# [[profiles]]
+# name = "heavy"
+# items = [100, 1000, 5000, 10000, 20000]
+# producers = 20
+# consumers = 2
 
 [[profiles]]
 name = "producers only"

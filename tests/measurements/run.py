@@ -33,6 +33,7 @@ class Measurement:
     consumers: int
     peak_size: int
     profile: str
+    storage_engine: str
     throughput: float
     version: str = aiodiskqueue.__version__
 
@@ -107,15 +108,19 @@ async def runner(
     timestamp: dt.datetime,
     run: int,
     profile_name: str,
+    cls_storage_engine,
 ):
     logger.info(
-        f"Starting run #{run} with profile {profile_name} and {items_count} items."
+        f"Starting run #{run} with engine {cls_storage_engine.__name__}, "
+        f"profile {profile_name} and {items_count} items."
     )
 
     # create queues
     source_queue = asyncio.Queue()
     data_path.unlink(missing_ok=True)
-    disk_queue = await aiodiskqueue.Queue.create(data_path)
+    disk_queue = await aiodiskqueue.Queue.create(
+        data_path, cls_storage_engine=cls_storage_engine
+    )
     result_queue = asyncio.Queue()
 
     # create source queue with items
@@ -158,6 +163,7 @@ async def runner(
         "consumers": consumer_count,
         "peak_size": disk_queue._peak_size,
         "profile": profile_name,
+        "storage_engine": cls_storage_engine.__name__,
         "throughput": throughput,
     }
     obj = Measurement(**data)
@@ -166,17 +172,19 @@ async def runner(
 
 async def start(data_path: Path, config: dict, run: int):
     timestamp = dt.datetime.now(tz=dt.timezone.utc)
-    for profile in config["profiles"]:
-        for item_count in profile["items"]:
-            await runner(
-                data_path,
-                item_count,
-                profile["producers"],
-                profile["consumers"],
-                timestamp,
-                run,
-                profile["name"],
-            )
+    for cls_storage_engine in [aiodiskqueue.PickledList, aiodiskqueue.PickleSequence]:
+        for profile in config["profiles"]:
+            for item_count in profile["items"]:
+                await runner(
+                    data_path,
+                    item_count,
+                    profile["producers"],
+                    profile["consumers"],
+                    timestamp,
+                    run,
+                    profile["name"],
+                    cls_storage_engine,
+                )
 
 
 def load_config() -> dict:
