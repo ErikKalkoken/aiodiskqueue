@@ -22,7 +22,15 @@ class _StorageEngine(ABC):
     @property
     @abstractmethod
     def can_append(self) -> bool:  # type: ignore
-        """Can append items to data file.
+        """Can append single items to end of data file.
+
+        :meta private:
+        """
+
+    @property
+    @abstractmethod
+    def can_remove(self) -> bool:  # type: ignore
+        """Can remove single item from start of data file.
 
         :meta private:
         """
@@ -42,7 +50,14 @@ class _StorageEngine(ABC):
         """
 
     async def append_item(self, item: Any):
-        """Append one item to data file.
+        """Append one item to end of data file.
+
+        :meta private:
+        """
+        raise NotImplementedError()
+
+    async def remove_item(self) -> Any:
+        """Remove item from start of data file.
 
         :meta private:
         """
@@ -50,10 +65,14 @@ class _StorageEngine(ABC):
 
 
 class PickledList(_StorageEngine):
-    """This engine stored items as one singular pickled list of items."""
+    """This engine stores items as one singular pickled list of items."""
 
     @property
     def can_append(self) -> bool:
+        return False
+
+    @property
+    def can_remove(self) -> bool:
         return False
 
     async def load_all_items(self) -> List[Any]:
@@ -86,6 +105,10 @@ class PickleSequence(_StorageEngine):
     @property
     def can_append(self) -> bool:
         return True
+
+    @property
+    def can_remove(self) -> bool:
+        return False
 
     async def load_all_items(self) -> List[Any]:
         try:
