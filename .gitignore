@@ -13,3 +13,4 @@ _build/
 coverage.xml
 *.sqlite
 *.dat
+tests/measurements/measurements.csv
