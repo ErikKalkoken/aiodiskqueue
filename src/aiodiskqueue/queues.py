@@ -90,7 +90,7 @@ class Queue(metaclass=NoDirectInstantiation):
                 raise QueueEmpty()
 
             item = self._queue.pop(0)
-            await self._storage_engine.dequeue(self._queue)
+            await self._storage_engine.remove_item(self._queue)
             size = self.qsize()
             self._peak_size = max(self._peak_size, size)
 
@@ -137,7 +137,7 @@ class Queue(metaclass=NoDirectInstantiation):
             if self._maxsize and self.qsize() >= self._maxsize:
                 raise QueueFull
             self._queue.append(item)
-            await self._storage_engine.enqueue(item, self._queue)
+            await self._storage_engine.add_item(item, self._queue)
             async with self._tasks_are_finished:
                 self._unfinished_tasks += 1
 

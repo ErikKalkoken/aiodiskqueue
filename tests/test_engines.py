@@ -14,35 +14,35 @@ class TestStorageEngine:
         # then
         self.assertTrue(self.data_path.exists())
 
-    async def test_can_enqueue_item_to_new_db(self):
+    async def test_can_add_item_item_to_new_db(self):
         # when
-        await self.engine.enqueue("alpha", ["alpha"])
+        await self.engine.add_item("alpha", ["alpha"])
         # then
         items = await self.engine.fetch_all()
         self.assertListEqual(items, ["alpha"])
 
-    async def test_can_enqueue_multiple_items_to_new_db(self):
+    async def test_can_add_item_multiple_items_to_new_db(self):
         # when
-        await self.engine.enqueue("alpha", ["alpha"])
-        await self.engine.enqueue("bravo", ["alpha", "bravo"])
-        await self.engine.enqueue("charlie", ["alpha", "bravo", "charlie"])
+        await self.engine.add_item("alpha", ["alpha"])
+        await self.engine.add_item("bravo", ["alpha", "bravo"])
+        await self.engine.add_item("charlie", ["alpha", "bravo", "charlie"])
         # then
         items = await self.engine.fetch_all()
         self.assertListEqual(items, ["alpha", "bravo", "charlie"])
 
     async def test_roundtrip_for_single_item(self):
         # when
-        await self.engine.enqueue("alpha", [])
-        await self.engine.dequeue([])
+        await self.engine.add_item("alpha", [])
+        await self.engine.remove_item([])
         # then
         items = await self.engine.fetch_all()
         self.assertListEqual(items, [])
 
     async def test_roundtrip_for_multiple_item(self):
         # when
-        await self.engine.enqueue("alpha", ["alpha"])
-        await self.engine.enqueue("bravo", ["alpha", "bravo"])
-        await self.engine.dequeue(["bravo"])
+        await self.engine.add_item("alpha", ["alpha"])
+        await self.engine.add_item("bravo", ["alpha", "bravo"])
+        await self.engine.remove_item(["bravo"])
         # then
         items = await self.engine.fetch_all()
         self.assertListEqual(items, ["bravo"])
@@ -82,7 +82,7 @@ class TestDbmEngine(TestStorageEngine, QueueAsyncioTestCase):
         super().setUp()
         self.engine = DbmEngine(self.data_path)
 
-    async def test_raise_error_when_trying_to_dequeue_from_empty_queue(self):
+    async def test_raise_error_when_trying_to_remove_item_from_empty_queue(self):
         # when/then
         with self.assertRaises(ValueError):
-            await self.engine.dequeue([])
+            await self.engine.remove_item([])

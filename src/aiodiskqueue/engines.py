@@ -30,7 +30,7 @@ class _LifoStorageEngine(ABC):
         """Return all items in data file."""
 
     @abstractmethod
-    async def enqueue(self, item: Any, items: List[Any]):
+    async def add_item(self, item: Any, items: List[Any]):
         """Append one item to end of data file.
 
         Args:
@@ -39,7 +39,7 @@ class _LifoStorageEngine(ABC):
         """
 
     @abstractmethod
-    async def dequeue(self, items: List[Any]):
+    async def remove_item(self, items: List[Any]):
         """Remove item from start of data file.
 
         Args:
@@ -73,10 +73,10 @@ class PickledList(_LifoStorageEngine):
 
         return queue
 
-    async def enqueue(self, item: Any, items: List[Any]):
+    async def add_item(self, item: Any, items: List[Any]):
         await self._save_all_items(items)
 
-    async def dequeue(self, items: List[Any]):
+    async def remove_item(self, items: List[Any]):
         await self._save_all_items(items)
 
     async def _save_all_items(self, items: List[Any]):
@@ -118,11 +118,11 @@ class PickleSequence(_LifoStorageEngine):
                     items.append(item)
         return items
 
-    async def enqueue(self, item: Any, items: List[Any]):
+    async def add_item(self, item: Any, items: List[Any]):
         async with aiofiles.open(self._data_path, "ab", buffering=0) as file:
             await file.write(pickle.dumps(item))
 
-    async def dequeue(self, items: List[Any]):
+    async def remove_item(self, items: List[Any]):
         await self._save_all_items(items)
 
     async def _save_all_items(self, items: List[Any]):
@@ -161,7 +161,7 @@ class DbmEngine(_LifoStorageEngine):
 
             return items
 
-    async def enqueue(self, item: Any, items: List[Any]):
+    async def add_item(self, item: Any, items: List[Any]):
         async with aiodbm.open(self._data_path, "c") as db:
             tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
             if tail_id:
@@ -177,7 +177,7 @@ class DbmEngine(_LifoStorageEngine):
             if is_first:
                 await self._set_obj(db, self.HEAD_ID_KEY, item_id)
 
-    async def dequeue(self, items: List[Any]):
+    async def remove_item(self, items: List[Any]):
         async with aiodbm.open(self._data_path, "c") as db:
             head_id = await self._get_obj(db, self.HEAD_ID_KEY)
             tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
