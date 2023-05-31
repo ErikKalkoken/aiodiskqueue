@@ -1,8 +1,9 @@
 """Persistent queue for Python AsyncIO."""
 
-from aiodiskqueue.core import Queue
+from aiodiskqueue.engines import PickledList, PickleSequence
 from aiodiskqueue.exceptions import QueueEmpty, QueueFull
+from aiodiskqueue.queues import Queue
 
-__version__ = "0.1.0b2"
+__version__ = "0.1.0b5"
 
-__all__ = ["Queue", "QueueEmpty", "QueueFull"]
+__all__ = ["PickledList", "PickleSequence", "Queue", "QueueEmpty", "QueueFull"]

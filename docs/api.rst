@@ -5,4 +5,17 @@ API Reference
 ===============
 
 
-.. automodule:: aiodiskqueue
+Queues
+======
+
+.. automodule:: aiodiskqueue.queues
+
+Exceptions
+==========
+
+.. automodule:: aiodiskqueue.exceptions
+
+Storage Engines
+===============
+
+.. automodule:: aiodiskqueue.engines

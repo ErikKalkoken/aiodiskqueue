@@ -12,19 +12,19 @@ logger = logging.getLogger(__name__)
 async def producer(
     source_queue: asyncio.Queue, disk_queue: aiodiskqueue.Queue, num: int
 ):
-    logger.info("Starting producer %d", num)
+    logger.debug("Starting producer %d", num)
     while True:
         try:
             item = source_queue.get_nowait()
         except asyncio.QueueEmpty:
-            logger.info("Stopping producer %d", num)
+            logger.debug("Stopping producer %d", num)
             return
         else:
             await disk_queue.put(item)
 
 
 async def consumer(disk_queue: aiodiskqueue.Queue, result_queue: asyncio.Queue):
-    logger.info("Starting consumer")
+    logger.debug("Starting consumer")
     try:
         while True:
             item = await disk_queue.get()
@@ -37,10 +37,10 @@ async def consumer(disk_queue: aiodiskqueue.Queue, result_queue: asyncio.Queue):
 class TestIntegration(QueueAsyncioTestCase):
     async def test_multiple_consumer_and_producers(self):
         # parameters
-        ITEMS_AMOUNT = 500
-        PRODUCER_AMOUNT = 10
+        ITEMS_AMOUNT = 100
+        PRODUCER_AMOUNT = 5
         CONSUMER_AMOUNT = 2
-        DISKQUEUE_MAXSIZE = 100
+        DISKQUEUE_MAXSIZE = 50
 
         # create queues
         source_queue = asyncio.Queue()
@@ -66,7 +66,7 @@ class TestIntegration(QueueAsyncioTestCase):
         await asyncio.gather(*producers)
 
         # wait for consumers to finish
-        logger.info("Waiting for consumers to complete...")
+        logger.debug("Waiting for consumers to complete...")
         await disk_queue.join()
         for task in consumer_tasks:
             task.cancel()

@@ -1,13 +1,14 @@
 """Core implementation of a persistent AsyncIO queue."""
+
 import asyncio
 import logging
-import pickle
 from pathlib import Path
 from typing import Any, Union
 
 import aiofiles
 import aiofiles.os
 
+from aiodiskqueue.engines import PickledList, _StorageEngine
 from aiodiskqueue.exceptions import QueueEmpty, QueueFull
 from aiodiskqueue.utils import NoDirectInstantiation
 
@@ -25,7 +26,13 @@ class Queue(metaclass=NoDirectInstantiation):
     To create a new object the factory method :func:`create` must be used.
     """
 
-    def __init__(self, data_path: Path, maxsize: int, queue: list) -> None:
+    def __init__(
+        self,
+        data_path: Path,
+        maxsize: int,
+        queue: list,
+        storage_engine: _StorageEngine,
+    ) -> None:
         """Direct instantiation would break the persistance feature
         and has therefore been disabled.
 
@@ -40,6 +47,7 @@ class Queue(metaclass=NoDirectInstantiation):
         self._unfinished_tasks = 0
         self._peak_size = len(queue)  # measuring peak size of the queue
         self._queue = list(queue)
+        self._storage_engine = storage_engine
 
     @property
     def maxsize(self) -> int:
@@ -133,7 +141,10 @@ class Queue(metaclass=NoDirectInstantiation):
             if self._maxsize and self.qsize() >= self._maxsize:
                 raise QueueFull
             self._queue.append(item)
-            await self._write_queue()
+            if self._storage_engine.can_append:
+                await self._storage_engine.append_item(item)
+            else:
+                await self._storage_engine.save_all_items(self._queue)
             async with self._tasks_are_finished:
                 self._unfinished_tasks += 1
 
@@ -170,65 +181,55 @@ class Queue(metaclass=NoDirectInstantiation):
                 self._tasks_are_finished.notify_all()
 
     async def _write_queue(self):
-        await self._write_queue_to_path(self._data_path, self._queue)
+        await self._storage_engine.save_all_items(self._queue)
         size = self.qsize()
         self._peak_size = max(self._peak_size, size)
         logger.debug("Wrote queue with %d items: %s", size, self._data_path)
 
-    @staticmethod
-    async def _write_queue_to_path(data_path: Path, queue: list):
-        async with aiofiles.open(
-            data_path, "wb", buffering=0
-        ) as fp:  # buffering is disabled to prevent the unclosed file issue.
-            await fp.write(pickle.dumps(queue))
-
     @classmethod
-    async def _read_queue(cls, data_path: Path) -> list:
-        try:
-            async with aiofiles.open(data_path, "rb", buffering=0) as fp:
-                data = await fp.read()
-        except FileNotFoundError:
-            await cls._write_queue_to_path(data_path, [])  # ensuring early we can write
-            await aiofiles.os.remove(data_path)
-            return []
-
-        try:
-            queue = pickle.loads(data)
-        except pickle.PickleError:
-            backup_path = data_path.with_suffix(".bak")
-            await aiofiles.os.rename(data_path, backup_path)
-            logger.exception(
-                "Data file is corrupt and has been backed up: %s", backup_path
-            )
-            return []
-
-        logger.info(
-            "Resurrecting queue with %d items from: %s",
-            len(queue),
-            data_path,
-        )
-        return queue
-
-    @classmethod
-    async def create(cls, data_path: Union[str, Path], maxsize: int = 0) -> "Queue":
+    async def create(
+        cls,
+        data_path: Union[str, Path],
+        maxsize: int = 0,
+        cls_storage_engine=None,
+    ) -> "Queue":
         """Create a new queue instance.
 
         A data file will be created at the given path if it does not already exist.
 
-        If the data file already exists, if will be used to recreate the queue if possible.
-        Should that fail, the existing data file will be backed up and the queue reset.
+        If the data file already exists, if will be used to recreate the queue
+        if possible. Should that fail, the existing data file will be backed up
+        and the queue reset.
 
         Please note that using two different instances with the same data file
         simultaneously is not recommended as it may lead to data corruption.
 
         Args:
             data_path: Path of the data file for this queue. e.g. `queue.dat`
-            maxsize: If maxsize is less than or equal to zero, the queue size is infinite.
+            maxsize: If maxsize is less than or equal to zero,
+                the queue size is infinite.
                 If it is an integer greater than 0, then put() blocks
                 when the queue reaches maxsize until an item is removed by get().
+            cls_storage_engine: Define the storage engine to be used.
+                Default is :class:`.PickleSequence`.
         """
         data_path = Path(data_path)
         if data_path.suffix == ".bak":
             raise ValueError("Invalid file name: .bak suffix is reserved for backups")
-        queue = await cls._read_queue(data_path)
-        return cls._create(data_path, maxsize, queue)
+
+        if not cls_storage_engine:
+            cls_storage_engine = PickledList
+        else:
+            if not issubclass(cls_storage_engine, _StorageEngine):
+                raise TypeError("Invalid storage engine")
+        storage_engine = cls_storage_engine(data_path)
+        queue = await storage_engine.load_all_items()
+        if not queue:
+            await storage_engine.save_all_items([])  # ensuring early we can write
+            await aiofiles.os.remove(data_path)
+        else:
+            logger.info(
+                "Read %d items from existing data file: %s", len(queue), data_path
+            )
+
+        return cls._create(data_path, maxsize, queue, storage_engine)
