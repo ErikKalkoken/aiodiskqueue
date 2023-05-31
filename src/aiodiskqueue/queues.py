@@ -5,10 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any, Union
 
-import aiofiles
-import aiofiles.os
-
-from aiodiskqueue.engines import PickledList, _StorageEngine
+from aiodiskqueue.engines import PickledList, _LifoStorageEngine
 from aiodiskqueue.exceptions import QueueEmpty, QueueFull
 from aiodiskqueue.utils import NoDirectInstantiation
 
@@ -31,7 +28,7 @@ class Queue(metaclass=NoDirectInstantiation):
         data_path: Path,
         maxsize: int,
         queue: list,
-        storage_engine: _StorageEngine,
+        storage_engine: _LifoStorageEngine,
     ) -> None:
         """Direct instantiation would break the persistance feature
         and has therefore been disabled.
@@ -93,10 +90,9 @@ class Queue(metaclass=NoDirectInstantiation):
                 raise QueueEmpty()
 
             item = self._queue.pop(0)
-            if self._queue:
-                await self._write_queue()
-            else:
-                await aiofiles.os.remove(self._data_path)
+            await self._storage_engine.dequeue(self._queue)
+            size = self.qsize()
+            self._peak_size = max(self._peak_size, size)
 
         if self._maxsize:
             async with self._has_free_slots:
@@ -141,10 +137,7 @@ class Queue(metaclass=NoDirectInstantiation):
             if self._maxsize and self.qsize() >= self._maxsize:
                 raise QueueFull
             self._queue.append(item)
-            if self._storage_engine.can_append:
-                await self._storage_engine.append_item(item)
-            else:
-                await self._storage_engine.save_all_items(self._queue)
+            await self._storage_engine.enqueue(item, self._queue)
             async with self._tasks_are_finished:
                 self._unfinished_tasks += 1
 
@@ -180,12 +173,6 @@ class Queue(metaclass=NoDirectInstantiation):
             if self._unfinished_tasks == 0:
                 self._tasks_are_finished.notify_all()
 
-    async def _write_queue(self):
-        await self._storage_engine.save_all_items(self._queue)
-        size = self.qsize()
-        self._peak_size = max(self._peak_size, size)
-        logger.debug("Wrote queue with %d items: %s", size, self._data_path)
-
     @classmethod
     async def create(
         cls,
@@ -220,13 +207,12 @@ class Queue(metaclass=NoDirectInstantiation):
         if not cls_storage_engine:
             cls_storage_engine = PickledList
         else:
-            if not issubclass(cls_storage_engine, _StorageEngine):
+            if not issubclass(cls_storage_engine, _LifoStorageEngine):
                 raise TypeError("Invalid storage engine")
         storage_engine = cls_storage_engine(data_path)
-        queue = await storage_engine.load_all_items()
+        queue = await storage_engine.fetch_all()
         if not queue:
-            await storage_engine.save_all_items([])  # ensuring early we can write
-            await aiofiles.os.remove(data_path)
+            await storage_engine.initialize()  # ensuring early we can write
         else:
             logger.info(
                 "Read %d items from existing data file: %s", len(queue), data_path

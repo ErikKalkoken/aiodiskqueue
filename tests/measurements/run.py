@@ -160,6 +160,23 @@ async def runner(
     logger.info("Throughput for %d items: %f items / sec", items_count, throughput)
     logger.info("Peak size of disk queue was: %d", disk_queue._peak_size)
 
+    # compare source items with result items
+    result_items = set()
+    while True:
+        try:
+            item = result_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+        else:
+            result_items.add(item)
+    dif = source_items.difference(result_items)
+    if dif:
+        logger.error("Differences found")
+        logger.info("dif: %s", sorted(list(dif)))
+        raise RuntimeError("Run failed due to differences")
+
+    logger.info("Data integrity confirmed")
+
     # write results
     data = {
         "timestamp": timestamp,

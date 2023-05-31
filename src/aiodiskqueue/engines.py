@@ -5,77 +5,56 @@ import logging
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Iterable, List
+from typing import Any, List, Optional, Union
 
+import aiodbm
 import aiofiles
 import aiofiles.os
+from aiodbm import DbmDatabaseAsync
 
 logger = logging.getLogger(__name__)
 
 
-class _StorageEngine(ABC):
-    """Base class for all storage engines."""
+class _LifoStorageEngine(ABC):
+    """Base class for all storage engines implementing a LIFO queue."""
 
     def __init__(self, data_path: Path) -> None:
         self._data_path = data_path
 
-    @property
     @abstractmethod
-    def can_append(self) -> bool:  # type: ignore
-        """Can append single items to end of data file.
-
-        :meta private:
-        """
-
-    @property
-    @abstractmethod
-    def can_remove(self) -> bool:  # type: ignore
-        """Can remove single item from start of data file.
-
-        :meta private:
-        """
+    async def initialize(self) -> List[Any]:
+        """Initialize data file."""
 
     @abstractmethod
-    async def load_all_items(self) -> List[Any]:  # type: ignore
-        """Load all items from data file.
-
-        :meta private:
-        """
+    async def fetch_all(self) -> List[Any]:
+        """Return all items in data file."""
 
     @abstractmethod
-    async def save_all_items(self, items: List[Any]):
-        """Saves all items to data file.
-
-        :meta private:
-        """
-
-    async def append_item(self, item: Any):
+    async def enqueue(self, item: Any, items: List[Any]):
         """Append one item to end of data file.
 
-        :meta private:
+        Args:
+            item: Item to be appended
+            items: All items including the one to be appended
         """
-        raise NotImplementedError()
 
-    async def remove_item(self) -> Any:
+    @abstractmethod
+    async def dequeue(self, items: List[Any]):
         """Remove item from start of data file.
 
-        :meta private:
+        Args:
+            item: Item to be removed
+            items: All items not including the one to be removed
         """
-        raise NotImplementedError()
 
 
-class PickledList(_StorageEngine):
+class PickledList(_LifoStorageEngine):
     """This engine stores items as one singular pickled list of items."""
 
-    @property
-    def can_append(self) -> bool:
-        return False
+    async def initialize(self):
+        await self._save_all_items([])
 
-    @property
-    def can_remove(self) -> bool:
-        return False
-
-    async def load_all_items(self) -> List[Any]:
+    async def fetch_all(self) -> List[Any]:
         try:
             async with aiofiles.open(self._data_path, "rb", buffering=0) as file:
                 data = await file.read()
@@ -94,23 +73,25 @@ class PickledList(_StorageEngine):
 
         return queue
 
-    async def save_all_items(self, items: Iterable[Any]):
+    async def enqueue(self, item: Any, items: List[Any]):
+        await self._save_all_items(items)
+
+    async def dequeue(self, items: List[Any]):
+        await self._save_all_items(items)
+
+    async def _save_all_items(self, items: List[Any]):
         async with aiofiles.open(self._data_path, "wb", buffering=0) as file:
             await file.write(pickle.dumps(items))
+        logger.debug("Wrote queue with %d items: %s", len(items), self._data_path)
 
 
-class PickleSequence(_StorageEngine):
+class PickleSequence(_LifoStorageEngine):
     """This engine stores items as a sequence of single pickles."""
 
-    @property
-    def can_append(self) -> bool:
-        return True
+    async def initialize(self):
+        await self._save_all_items([])
 
-    @property
-    def can_remove(self) -> bool:
-        return False
-
-    async def load_all_items(self) -> List[Any]:
+    async def fetch_all(self) -> List[Any]:
         try:
             async with aiofiles.open(self._data_path, "rb", buffering=0) as file:
                 pickled_bytes = await file.read()
@@ -137,7 +118,14 @@ class PickleSequence(_StorageEngine):
                     items.append(item)
         return items
 
-    async def save_all_items(self, items: Iterable[Any]):
+    async def enqueue(self, item: Any, items: List[Any]):
+        async with aiofiles.open(self._data_path, "ab", buffering=0) as file:
+            await file.write(pickle.dumps(item))
+
+    async def dequeue(self, items: List[Any]):
+        await self._save_all_items(items)
+
+    async def _save_all_items(self, items: List[Any]):
         with io.BytesIO() as buffer:
             for item in items:
                 pickle.dump(item, buffer)
@@ -145,7 +133,79 @@ class PickleSequence(_StorageEngine):
             data = buffer.read()
         async with aiofiles.open(self._data_path, "wb", buffering=0) as file:
             await file.write(data)
+        logger.debug("Wrote queue with %d items: %s", len(items), self._data_path)
 
-    async def append_item(self, item: Any):
-        async with aiofiles.open(self._data_path, "ab", buffering=0) as file:
-            await file.write(pickle.dumps(item))
+
+class DbmEngine(_LifoStorageEngine):
+    """A queue storage engine using DBM."""
+
+    HEAD_ID_KEY = "head_id"
+    TAIL_ID_KEY = "tail_id"
+
+    async def initialize(self):
+        async with aiodbm.open(self._data_path, "c"):
+            pass
+
+    async def fetch_all(self) -> List[Any]:
+        async with aiodbm.open(self._data_path, "r") as db:
+            head_id = await self._get_obj(db, self.HEAD_ID_KEY)
+            tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
+            if not head_id or not tail_id:
+                return []
+
+            items = []
+            for item_id in range(head_id, tail_id + 1):
+                item_key = self._make_item_key(item_id)
+                item = await self._get_obj(db, item_key)
+                items.append(item)
+
+            return items
+
+    async def enqueue(self, item: Any, items: List[Any]):
+        async with aiodbm.open(self._data_path, "c") as db:
+            tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
+            if tail_id:
+                item_id = tail_id + 1
+                is_first = False
+            else:
+                item_id = 1
+                is_first = True
+
+            await self._set_obj(db, self._make_item_key(item_id), item)
+            await self._set_obj(db, self.TAIL_ID_KEY, item_id)
+
+            if is_first:
+                await self._set_obj(db, self.HEAD_ID_KEY, item_id)
+
+    async def dequeue(self, items: List[Any]):
+        async with aiodbm.open(self._data_path, "c") as db:
+            head_id = await self._get_obj(db, self.HEAD_ID_KEY)
+            tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
+            if not head_id or not tail_id:
+                raise ValueError("Nothing to remove from an empty database")
+            item_key = self._make_item_key(head_id)
+            await db.delete(item_key)
+
+            if head_id != tail_id:
+                # there are items left
+                await self._set_obj(db, self.HEAD_ID_KEY, head_id + 1)
+            else:
+                # was last item
+                await db.delete(self.HEAD_ID_KEY)
+                await db.delete(self.TAIL_ID_KEY)
+
+    @staticmethod
+    def _make_item_key(item_id: int) -> str:
+        return f"item-{item_id}"
+
+    @staticmethod
+    async def _get_obj(db: DbmDatabaseAsync, key: Union[str, bytes]) -> Optional[Any]:
+        data = await db.get(key)
+        if not data:
+            return None
+        return pickle.loads(data)
+
+    @staticmethod
+    async def _set_obj(db: DbmDatabaseAsync, key: Union[str, bytes], item: Any):
+        data = pickle.dumps(item)
+        await db.set(key, data)
