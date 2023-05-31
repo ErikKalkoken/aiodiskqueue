@@ -47,6 +47,12 @@ class TestStorageEngine:
         items = await self.engine.fetch_all()
         self.assertListEqual(items, ["bravo"])
 
+    async def test_fetch_all_one_missing_file_returns_empty_list(self):
+        # when
+        items = await self.engine.fetch_all()
+        # then
+        self.assertListEqual(items, [])
+
     # def tearDown(self) -> None:
     #     print()
     #     print("key|content")

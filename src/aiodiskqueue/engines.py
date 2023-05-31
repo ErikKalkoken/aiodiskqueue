@@ -1,5 +1,6 @@
 """Engines for storing the queues on disk."""
 
+import dbm
 import io
 import logging
 import pickle
@@ -147,19 +148,22 @@ class DbmEngine(_LifoStorageEngine):
             pass
 
     async def fetch_all(self) -> List[Any]:
-        async with aiodbm.open(self._data_path, "r") as db:
-            head_id = await self._get_obj(db, self.HEAD_ID_KEY)
-            tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
-            if not head_id or not tail_id:
-                return []
+        try:
+            async with aiodbm.open(self._data_path, "r") as db:
+                head_id = await self._get_obj(db, self.HEAD_ID_KEY)
+                tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
+                if not head_id or not tail_id:
+                    return []
 
+                items = []
+                for item_id in range(head_id, tail_id + 1):
+                    item_key = self._make_item_key(item_id)
+                    item = await self._get_obj(db, item_key)
+                    items.append(item)
+        except dbm.error:
             items = []
-            for item_id in range(head_id, tail_id + 1):
-                item_key = self._make_item_key(item_id)
-                item = await self._get_obj(db, item_key)
-                items.append(item)
 
-            return items
+        return items
 
     async def add_item(self, item: Any, items: List[Any]):
         async with aiodbm.open(self._data_path, "c") as db:
