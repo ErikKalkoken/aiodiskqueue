@@ -8,7 +8,7 @@ from typing import Any, Union
 import aiofiles
 import aiofiles.os
 
-from aiodiskqueue.engines import PickleSequence, _StorageEngine
+from aiodiskqueue.engines import PickledList, _StorageEngine
 from aiodiskqueue.exceptions import QueueEmpty, QueueFull
 from aiodiskqueue.utils import NoDirectInstantiation
 
@@ -218,7 +218,7 @@ class Queue(metaclass=NoDirectInstantiation):
             raise ValueError("Invalid file name: .bak suffix is reserved for backups")
 
         if not cls_storage_engine:
-            cls_storage_engine = PickleSequence
+            cls_storage_engine = PickledList
         else:
             if not issubclass(cls_storage_engine, _StorageEngine):
                 raise TypeError("Invalid storage engine")
