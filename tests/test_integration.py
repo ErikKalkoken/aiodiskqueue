@@ -89,12 +89,12 @@ class TestIntegration(QueueAsyncioTestCase):
 
     async def test_with_pickled_sequence(self):
         source_items, result_items = await run_test(
-            self.data_path, aiodiskqueue.PickleSequence
+            self.data_path, aiodiskqueue.engines.PickleSequence
         )
         self.assertSetEqual(source_items, result_items)
 
     async def test_with_dbm_engine(self):
         source_items, result_items = await run_test(
-            self.data_path, aiodiskqueue.DbmEngine
+            self.data_path, aiodiskqueue.engines.DbmEngine
         )
         self.assertSetEqual(source_items, result_items)

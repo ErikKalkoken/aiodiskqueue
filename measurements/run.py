@@ -202,8 +202,8 @@ async def start(
 
     for cls_storage_engine in [
         aiodiskqueue.PickledList,
-        aiodiskqueue.PickleSequence,
-        aiodiskqueue.DbmEngine,
+        aiodiskqueue.engines.PickleSequence,
+        aiodiskqueue.engines.DbmEngine,
     ]:
         for profile in profiles:
             for item_count in item_counts:

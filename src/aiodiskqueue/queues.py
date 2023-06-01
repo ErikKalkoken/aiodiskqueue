@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any, Union
 
-from aiodiskqueue.engines import PickledList, _LifoStorageEngine
+from aiodiskqueue.engines.simple import PickledList, _LifoStorageEngine
 from aiodiskqueue.exceptions import QueueEmpty, QueueFull
 from aiodiskqueue.utils import NoDirectInstantiation
 

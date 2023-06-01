@@ -4,7 +4,7 @@ import aiofiles
 import aiofiles.os
 
 from aiodiskqueue import Queue, QueueEmpty, QueueFull
-from aiodiskqueue.engines import PickledList, PickleSequence
+from aiodiskqueue.engines.simple import PickledList, PickleSequence
 
 from .factories import ItemFactory
 from .helpers import QueueAsyncioTestCase

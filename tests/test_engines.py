@@ -1,6 +1,6 @@
 # type: ignore
 
-from aiodiskqueue import DbmEngine, PickledList, PickleSequence
+from aiodiskqueue.engines import DbmEngine, PickledList, PickleSequence
 
 from .helpers import QueueAsyncioTestCase
 
