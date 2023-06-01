@@ -100,3 +100,12 @@ class TestIntegration(QueueAsyncioTestCase):
             self.data_path, aiodiskqueue.engines.DbmEngine
         )
         self.assertSetEqual(source_items, result_items)
+
+    @skipIf(
+        not hasattr(aiodiskqueue.engines, "SqliteEngine"), "aiosqlite not installed"
+    )
+    async def test_with_sqlite_engine(self):
+        source_items, result_items = await run_test(
+            self.data_path, aiodiskqueue.engines.SqliteEngine
+        )
+        self.assertSetEqual(source_items, result_items)

@@ -201,9 +201,10 @@ async def start(
     item_counts = [count for count in config["common"]["items"] if count <= max_items]
 
     for cls_storage_engine in [
-        aiodiskqueue.PickledList,
+        aiodiskqueue.engines.PickledList,
         aiodiskqueue.engines.PickleSequence,
         aiodiskqueue.engines.DbmEngine,
+        aiodiskqueue.engines.SqliteEngine,
     ]:
         for profile in profiles:
             for item_count in item_counts:
