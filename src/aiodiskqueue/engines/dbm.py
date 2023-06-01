@@ -3,6 +3,7 @@
 import dbm
 import logging
 import pickle
+from pathlib import Path
 from typing import Any, List, Optional, Union
 
 try:
@@ -21,16 +22,21 @@ if has_aiodbm:
     class DbmEngine(_FifoStorageEngine):
         """A queue storage engine using DBM."""
 
+        def __init__(self, data_path: Path) -> None:
+            super().__init__(data_path)
+            self._data_path_2 = str(data_path.absolute())
+
         HEAD_ID_KEY = "head_id"
         TAIL_ID_KEY = "tail_id"
 
         async def initialize(self):
-            async with aiodbm.open(self._data_path, "c"):
-                pass
+            async with aiodbm.open(self._data_path_2, "c") as db:
+                await db.set("dummy", "test")
+                await db.delete("dummy")
 
         async def fetch_all(self) -> List[Any]:
             try:
-                async with aiodbm.open(self._data_path, "r") as db:
+                async with aiodbm.open(self._data_path_2, "r") as db:
                     head_id = await self._get_obj(db, self.HEAD_ID_KEY)
                     tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
                     if not head_id or not tail_id:
@@ -47,7 +53,7 @@ if has_aiodbm:
             return items
 
         async def add_item(self, item: Any, items: List[Any]):
-            async with aiodbm.open(self._data_path, "wf") as db:
+            async with aiodbm.open(self._data_path_2, "w") as db:
                 tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
                 if tail_id:
                     item_id = tail_id + 1
@@ -62,10 +68,8 @@ if has_aiodbm:
                 if is_first:
                     await self._set_obj(db, self.HEAD_ID_KEY, item_id)
 
-                await db.sync()  # type: ignore
-
         async def remove_item(self, items: List[Any]):
-            async with aiodbm.open(self._data_path, "wf") as db:
+            async with aiodbm.open(self._data_path_2, "w") as db:
                 head_id = await self._get_obj(db, self.HEAD_ID_KEY)
                 tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
                 if not head_id or not tail_id:
@@ -80,8 +84,6 @@ if has_aiodbm:
                     # was last item
                     await db.delete(self.HEAD_ID_KEY)
                     await db.delete(self.TAIL_ID_KEY)
-
-                await db.sync()  # type: ignore
 
         @staticmethod
         def _make_item_key(item_id: int) -> str:
