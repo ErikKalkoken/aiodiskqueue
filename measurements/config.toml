@@ -17,11 +17,11 @@ producers = 20
 consumers = 2
 
 [[profiles]]
-name = "producers only"
+name = "producers"
 producers = 2
 consumers = 0
 
 [[profiles]]
-name = "consumers only"
+name = "consumers"
 producers = 0
 consumers = 2

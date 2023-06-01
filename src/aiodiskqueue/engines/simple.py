@@ -3,79 +3,23 @@
 import io
 import logging
 import pickle
-from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Any, Iterable, List
+from typing import Any, List
 
 import aiofiles
 import aiofiles.os
 
+from .base import _FifoStorageEngine
+
 logger = logging.getLogger(__name__)
 
 
-class _StorageEngine(ABC):
-    """Base class for all storage engines."""
-
-    def __init__(self, data_path: Path) -> None:
-        self._data_path = data_path
-
-    @property
-    @abstractmethod
-    def can_append(self) -> bool:  # type: ignore
-        """Can append single items to end of data file.
-
-        :meta private:
-        """
-
-    @property
-    @abstractmethod
-    def can_remove(self) -> bool:  # type: ignore
-        """Can remove single item from start of data file.
-
-        :meta private:
-        """
-
-    @abstractmethod
-    async def load_all_items(self) -> List[Any]:  # type: ignore
-        """Load all items from data file.
-
-        :meta private:
-        """
-
-    @abstractmethod
-    async def save_all_items(self, items: List[Any]):
-        """Saves all items to data file.
-
-        :meta private:
-        """
-
-    async def append_item(self, item: Any):
-        """Append one item to end of data file.
-
-        :meta private:
-        """
-        raise NotImplementedError()
-
-    async def remove_item(self) -> Any:
-        """Remove item from start of data file.
-
-        :meta private:
-        """
-        raise NotImplementedError()
-
-
-class PickledList(_StorageEngine):
+class PickledList(_FifoStorageEngine):
     """This engine stores items as one singular pickled list of items."""
 
-    @property
-    def can_append(self) -> bool:
-        return False
+    async def initialize(self):
+        await self._save_all_items([])
 
-    @property
-    def can_remove(self) -> bool:
-        return False
-
-    async def load_all_items(self) -> List[Any]:
+    async def fetch_all(self) -> List[Any]:
         try:
             async with aiofiles.open(self._data_path, "rb", buffering=0) as file:
                 data = await file.read()
@@ -94,23 +38,25 @@ class PickledList(_StorageEngine):
 
         return queue
 
-    async def save_all_items(self, items: Iterable[Any]):
+    async def add_item(self, item: Any, items: List[Any]):
+        await self._save_all_items(items)
+
+    async def remove_item(self, items: List[Any]):
+        await self._save_all_items(items)
+
+    async def _save_all_items(self, items: List[Any]):
         async with aiofiles.open(self._data_path, "wb", buffering=0) as file:
             await file.write(pickle.dumps(items))
+        logger.debug("Wrote queue with %d items: %s", len(items), self._data_path)
 
 
-class PickleSequence(_StorageEngine):
+class PickleSequence(_FifoStorageEngine):
     """This engine stores items as a sequence of single pickles."""
 
-    @property
-    def can_append(self) -> bool:
-        return True
+    async def initialize(self):
+        await self._save_all_items([])
 
-    @property
-    def can_remove(self) -> bool:
-        return False
-
-    async def load_all_items(self) -> List[Any]:
+    async def fetch_all(self) -> List[Any]:
         try:
             async with aiofiles.open(self._data_path, "rb", buffering=0) as file:
                 pickled_bytes = await file.read()
@@ -137,7 +83,14 @@ class PickleSequence(_StorageEngine):
                     items.append(item)
         return items
 
-    async def save_all_items(self, items: Iterable[Any]):
+    async def add_item(self, item: Any, items: List[Any]):
+        async with aiofiles.open(self._data_path, "ab", buffering=0) as file:
+            await file.write(pickle.dumps(item))
+
+    async def remove_item(self, items: List[Any]):
+        await self._save_all_items(items)
+
+    async def _save_all_items(self, items: List[Any]):
         with io.BytesIO() as buffer:
             for item in items:
                 pickle.dump(item, buffer)
@@ -145,7 +98,4 @@ class PickleSequence(_StorageEngine):
             data = buffer.read()
         async with aiofiles.open(self._data_path, "wb", buffering=0) as file:
             await file.write(data)
-
-    async def append_item(self, item: Any):
-        async with aiofiles.open(self._data_path, "ab", buffering=0) as file:
-            await file.write(pickle.dumps(item))
+        logger.debug("Wrote queue with %d items: %s", len(items), self._data_path)

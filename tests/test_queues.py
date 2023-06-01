@@ -4,7 +4,7 @@ import aiofiles
 import aiofiles.os
 
 from aiodiskqueue import Queue, QueueEmpty, QueueFull
-from aiodiskqueue.engines import PickledList, PickleSequence
+from aiodiskqueue.engines.simple import PickledList, PickleSequence
 
 from .factories import ItemFactory
 from .helpers import QueueAsyncioTestCase
@@ -106,14 +106,14 @@ class TestPutIntoQueue(QueueAsyncioTestCase):
         result = q.qsize()
         self.assertEqual(result, 2)
 
-    async def test_should_delete_file_when_queue_is_empty(self):
+    async def test_should_keep_data_file_for_empty_queue(self):
         # given
         q = await Queue.create(self.data_path)
         await q.put_nowait(ItemFactory)
         # when
         await q.get()
         # then
-        self.assertFalse(self.data_path.exists())
+        self.assertTrue(self.data_path.exists())
 
     async def test_should_raise_error_when_putting_into_full_queue(self):
         # given

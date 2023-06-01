@@ -2,12 +2,14 @@
 
 Runs multiple producers and consumers in parallel and measures duration and throughput.
 """
+import argparse
 import asyncio
 import csv
 import datetime as dt
 import logging
 import random
 import string
+import tempfile
 import time
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
@@ -17,7 +19,7 @@ import tomllib
 
 import aiodiskqueue
 
-logging.basicConfig(level="INFO", format="%(asctime)s - %(levelname)s -  %(message)s")
+logging.basicConfig(level="INFO", format="%(asctime)s | %(levelname)s | %(message)s")
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,6 @@ class Measurement:
     FILENAME = "measurements.csv"
 
     timestamp: dt.datetime
-    run: int
     items: int
     producers: int
     consumers: int
@@ -54,17 +55,6 @@ class Measurement:
     @classmethod
     def field_names(cls) -> List[str]:
         return [field.name for field in fields(cls)]
-
-    @classmethod
-    def latest_run(cls) -> int:
-        if not cls.path().exists():
-            return 0
-        with cls.path().open("r") as csv_file:
-            run_nums = []
-            reader = csv.DictReader(csv_file)
-            for row in reader:
-                run_nums.append(int(row["run"]))
-        return max(run_nums)
 
     @classmethod
     def path(cls) -> Path:
@@ -106,12 +96,11 @@ async def runner(
     producer_count: int,
     consumer_count: int,
     timestamp: dt.datetime,
-    run: int,
     profile_name: str,
     cls_storage_engine,
 ):
     logger.info(
-        f"Starting run #{run} with engine {cls_storage_engine.__name__}, "
+        f"Starting run with engine {cls_storage_engine.__name__}, "
         f"profile {profile_name} and {items_count} items."
     )
 
@@ -160,10 +149,26 @@ async def runner(
     logger.info("Throughput for %d items: %f items / sec", items_count, throughput)
     logger.info("Peak size of disk queue was: %d", disk_queue._peak_size)
 
+    # compare source items with result items
+    result_items = set()
+    while True:
+        try:
+            item = result_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+        else:
+            result_items.add(item)
+    dif = source_items.difference(result_items)
+    if dif:
+        logger.error("Differences found")
+        logger.info("dif: %s", sorted(list(dif)))
+        raise RuntimeError("Run failed due to differences")
+
+    logger.info("Data integrity confirmed")
+
     # write results
     data = {
         "timestamp": timestamp,
-        "run": run,
         "items": items_count,
         "producers": producer_count,
         "consumers": consumer_count,
@@ -176,18 +181,38 @@ async def runner(
     obj.save()
 
 
-async def start(data_path: Path, config: dict, run: int):
+async def start(
+    data_path: Path,
+    config: dict,
+    profile_name_override=None,
+    max_items=None,
+):
     timestamp = dt.datetime.now(tz=dt.timezone.utc)
-    for cls_storage_engine in [aiodiskqueue.PickleSequence, aiodiskqueue.PickledList]:
-        for profile in config["profiles"]:
-            for item_count in config["common"]["items"]:
+
+    # select profile if override set
+    if profile_name_override:
+        profiles = [
+            obj for obj in config["profiles"] if obj["name"] == profile_name_override
+        ]
+    else:
+        profiles = config["profiles"]
+
+    # select item count if override set
+    item_counts = [count for count in config["common"]["items"] if count <= max_items]
+
+    for cls_storage_engine in [
+        aiodiskqueue.PickledList,
+        aiodiskqueue.engines.PickleSequence,
+        aiodiskqueue.engines.DbmEngine,
+    ]:
+        for profile in profiles:
+            for item_count in item_counts:
                 await runner(
                     data_path,
                     item_count,
                     profile["producers"],
                     profile["consumers"],
                     timestamp,
-                    run,
                     profile["name"],
                     cls_storage_engine,
                 )
@@ -200,10 +225,23 @@ def load_config() -> dict:
 
 
 def main():
-    data_path = Path(__file__).parent / "loadtest_queue.dat"
     config = load_config()
-    run = Measurement.latest_run() + 1
-    asyncio.run(start(data_path, config, run=run))
+    profiles = sorted([obj["name"] for obj in config["profiles"]])
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--profile", choices=profiles, help="Only run the given profile"
+    )
+    parser.add_argument(
+        "--max-items",
+        type=int,
+        choices=config["common"]["items"],
+        help="Max items to run with from the profile",
+    )
+    args = parser.parse_args()
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        data_path = Path(temp_dir) / "loadtest_queue.dat"
+        asyncio.run(start(data_path, config, args.profile, args.max_items))
 
 
 if __name__ == "__main__":
