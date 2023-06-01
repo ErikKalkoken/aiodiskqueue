@@ -2,6 +2,7 @@
 
 Runs multiple producers and consumers in parallel and measures duration and throughput.
 """
+import argparse
 import asyncio
 import csv
 import datetime as dt
@@ -17,7 +18,7 @@ import tomllib
 
 import aiodiskqueue
 
-logging.basicConfig(level="INFO", format="%(asctime)s - %(levelname)s -  %(message)s")
+logging.basicConfig(level="INFO", format="%(asctime)s | %(levelname)s | %(message)s")
 
 logger = logging.getLogger(__name__)
 
@@ -193,11 +194,34 @@ async def runner(
     obj.save()
 
 
-async def start(data_path: Path, config: dict, run: int):
+async def start(
+    data_path: Path,
+    config: dict,
+    run: int,
+    profile_name_override=None,
+    item_count_override=None,
+):
     timestamp = dt.datetime.now(tz=dt.timezone.utc)
-    for cls_storage_engine in [aiodiskqueue.PickleSequence, aiodiskqueue.PickledList]:
-        for profile in config["profiles"]:
-            for item_count in config["common"]["items"]:
+
+    # select profile if override set
+    if profile_name_override:
+        profiles = [
+            obj for obj in config["profiles"] if obj["name"] == profile_name_override
+        ]
+    else:
+        profiles = config["profiles"]
+
+    # select item count if override set
+    item_counts = (
+        [item_count_override] if item_count_override else config["common"]["items"]
+    )
+    for cls_storage_engine in [
+        aiodiskqueue.PickledList,
+        aiodiskqueue.PickleSequence,
+        aiodiskqueue.DbmEngine,
+    ]:
+        for profile in profiles:
+            for item_count in item_counts:
                 await runner(
                     data_path,
                     item_count,
@@ -219,8 +243,17 @@ def load_config() -> dict:
 def main():
     data_path = Path(__file__).parent / "loadtest_queue.dat"
     config = load_config()
+    profiles = sorted([obj["name"] for obj in config["profiles"]])
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--profile", choices=profiles, help="Only run the given profile"
+    )
+    parser.add_argument(
+        "--items", type=int, help="Only run with the given number of items"
+    )
+    args = parser.parse_args()
     run = Measurement.latest_run() + 1
-    asyncio.run(start(data_path, config, run=run))
+    asyncio.run(start(data_path, config, run, args.profile, args.items))
 
 
 if __name__ == "__main__":

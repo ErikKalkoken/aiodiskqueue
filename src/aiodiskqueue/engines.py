@@ -166,7 +166,7 @@ class DbmEngine(_LifoStorageEngine):
         return items
 
     async def add_item(self, item: Any, items: List[Any]):
-        async with aiodbm.open(self._data_path, "c") as db:
+        async with aiodbm.open(self._data_path, "wf") as db:
             tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
             if tail_id:
                 item_id = tail_id + 1
@@ -181,8 +181,10 @@ class DbmEngine(_LifoStorageEngine):
             if is_first:
                 await self._set_obj(db, self.HEAD_ID_KEY, item_id)
 
+            await db.sync()  # type: ignore
+
     async def remove_item(self, items: List[Any]):
-        async with aiodbm.open(self._data_path, "c") as db:
+        async with aiodbm.open(self._data_path, "wf") as db:
             head_id = await self._get_obj(db, self.HEAD_ID_KEY)
             tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
             if not head_id or not tail_id:
@@ -197,6 +199,8 @@ class DbmEngine(_LifoStorageEngine):
                 # was last item
                 await db.delete(self.HEAD_ID_KEY)
                 await db.delete(self.TAIL_ID_KEY)
+
+            await db.sync()  # type: ignore
 
     @staticmethod
     def _make_item_key(item_id: int) -> str:
