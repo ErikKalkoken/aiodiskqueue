@@ -9,6 +9,7 @@ import datetime as dt
 import logging
 import random
 import string
+import tempfile
 import time
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
@@ -28,7 +29,6 @@ class Measurement:
     FILENAME = "measurements.csv"
 
     timestamp: dt.datetime
-    run: int
     items: int
     producers: int
     consumers: int
@@ -55,17 +55,6 @@ class Measurement:
     @classmethod
     def field_names(cls) -> List[str]:
         return [field.name for field in fields(cls)]
-
-    @classmethod
-    def latest_run(cls) -> int:
-        if not cls.path().exists():
-            return 0
-        with cls.path().open("r") as csv_file:
-            run_nums = []
-            reader = csv.DictReader(csv_file)
-            for row in reader:
-                run_nums.append(int(row["run"]))
-        return max(run_nums)
 
     @classmethod
     def path(cls) -> Path:
@@ -107,12 +96,11 @@ async def runner(
     producer_count: int,
     consumer_count: int,
     timestamp: dt.datetime,
-    run: int,
     profile_name: str,
     cls_storage_engine,
 ):
     logger.info(
-        f"Starting run #{run} with engine {cls_storage_engine.__name__}, "
+        f"Starting run with engine {cls_storage_engine.__name__}, "
         f"profile {profile_name} and {items_count} items."
     )
 
@@ -181,7 +169,6 @@ async def runner(
     # write results
     data = {
         "timestamp": timestamp,
-        "run": run,
         "items": items_count,
         "producers": producer_count,
         "consumers": consumer_count,
@@ -197,9 +184,8 @@ async def runner(
 async def start(
     data_path: Path,
     config: dict,
-    run: int,
     profile_name_override=None,
-    item_count_override=None,
+    max_items=None,
 ):
     timestamp = dt.datetime.now(tz=dt.timezone.utc)
 
@@ -212,9 +198,8 @@ async def start(
         profiles = config["profiles"]
 
     # select item count if override set
-    item_counts = (
-        [item_count_override] if item_count_override else config["common"]["items"]
-    )
+    item_counts = [count for count in config["common"]["items"] if count <= max_items]
+
     for cls_storage_engine in [
         aiodiskqueue.PickledList,
         aiodiskqueue.PickleSequence,
@@ -228,7 +213,6 @@ async def start(
                     profile["producers"],
                     profile["consumers"],
                     timestamp,
-                    run,
                     profile["name"],
                     cls_storage_engine,
                 )
@@ -241,7 +225,6 @@ def load_config() -> dict:
 
 
 def main():
-    data_path = Path(__file__).parent / "loadtest_queue.dat"
     config = load_config()
     profiles = sorted([obj["name"] for obj in config["profiles"]])
     parser = argparse.ArgumentParser()
@@ -249,11 +232,16 @@ def main():
         "--profile", choices=profiles, help="Only run the given profile"
     )
     parser.add_argument(
-        "--items", type=int, help="Only run with the given number of items"
+        "--max-items",
+        type=int,
+        choices=config["common"]["items"],
+        help="Max items to run with from the profile",
     )
     args = parser.parse_args()
-    run = Measurement.latest_run() + 1
-    asyncio.run(start(data_path, config, run, args.profile, args.items))
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        data_path = Path(temp_dir) / "loadtest_queue.dat"
+        asyncio.run(start(data_path, config, args.profile, args.max_items))
 
 
 if __name__ == "__main__":
