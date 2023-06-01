@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any, Union
 
-from aiodiskqueue.engines.simple import PickledList, _LifoStorageEngine
+from aiodiskqueue.engines.simple import PickledList, _FifoStorageEngine
 from aiodiskqueue.exceptions import QueueEmpty, QueueFull
 from aiodiskqueue.utils import NoDirectInstantiation
 
@@ -28,7 +28,7 @@ class Queue(metaclass=NoDirectInstantiation):
         data_path: Path,
         maxsize: int,
         queue: list,
-        storage_engine: _LifoStorageEngine,
+        storage_engine: _FifoStorageEngine,
     ) -> None:
         """Direct instantiation would break the persistance feature
         and has therefore been disabled.
@@ -207,7 +207,7 @@ class Queue(metaclass=NoDirectInstantiation):
         if not cls_storage_engine:
             cls_storage_engine = PickledList
         else:
-            if not issubclass(cls_storage_engine, _LifoStorageEngine):
+            if not issubclass(cls_storage_engine, _FifoStorageEngine):
                 raise TypeError("Invalid storage engine")
         storage_engine = cls_storage_engine(data_path)
         queue = await storage_engine.fetch_all()

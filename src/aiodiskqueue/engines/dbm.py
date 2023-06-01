@@ -12,13 +12,13 @@ except ImportError:
 else:
     has_aiodbm = True
 
-from .base import _LifoStorageEngine
+from .base import _FifoStorageEngine
 
 logger = logging.getLogger(__name__)
 
 if has_aiodbm:
 
-    class DbmEngine(_LifoStorageEngine):
+    class DbmEngine(_FifoStorageEngine):
         """A queue storage engine using DBM."""
 
         HEAD_ID_KEY = "head_id"

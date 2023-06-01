@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from unittest import skipIf
 
 import aiodiskqueue
 
@@ -93,6 +94,7 @@ class TestIntegration(QueueAsyncioTestCase):
         )
         self.assertSetEqual(source_items, result_items)
 
+    @skipIf(not hasattr(aiodiskqueue.engines, "DbmEngine"), "aiodbm not installed")
     async def test_with_dbm_engine(self):
         source_items, result_items = await run_test(
             self.data_path, aiodiskqueue.engines.DbmEngine

@@ -8,8 +8,8 @@ from typing import Any, List
 logger = logging.getLogger(__name__)
 
 
-class _LifoStorageEngine(ABC):
-    """Base class for all storage engines implementing a LIFO queue."""
+class _FifoStorageEngine(ABC):
+    """Base class for all storage engines implementing a FIFO queue."""
 
     def __init__(self, data_path: Path) -> None:
         self._data_path = data_path

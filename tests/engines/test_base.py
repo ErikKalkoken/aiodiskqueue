@@ -1,9 +1,5 @@
 # type: ignore
 
-from aiodiskqueue.engines import DbmEngine, PickledList, PickleSequence
-
-from .helpers import QueueAsyncioTestCase
-
 
 class TestStorageEngine:
     """Mixin with tests for testing a storage engine."""
@@ -60,45 +56,3 @@ class TestStorageEngine:
         items = await self.engine.fetch_all()
         # then
         self.assertListEqual(items, [])
-
-    # def tearDown(self) -> None:
-    #     print()
-    #     print("key|content")
-    #     with dbm.open(str(self.data_path), "r") as db:
-    #         keys = db.keys()
-    #         for key in keys:
-    #             data = db.get(key)
-    #             if not data:
-    #                 item = None
-    #             else:
-    #                 try:
-    #                     item = pickle.loads(data)
-    #                 except pickle.PickleError:
-    #                     item = data
-    #             print(f"{key}|{item}")
-    #     super().tearDown()
-
-
-class TestPickledList(TestStorageEngine, QueueAsyncioTestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        self.engine = PickledList(self.data_path)
-
-
-class TestPickleSequence(TestStorageEngine, QueueAsyncioTestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        self.engine = PickleSequence(self.data_path)
-
-
-class TestDbmEngine(TestStorageEngine, QueueAsyncioTestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        self.engine = DbmEngine(self.data_path)
-
-    async def test_raise_error_when_trying_to_remove_item_from_empty_queue(self):
-        # given
-        await self.engine.initialize()
-        # when/then
-        with self.assertRaises(ValueError):
-            await self.engine.remove_item([])

@@ -22,6 +22,11 @@ dependencies = [
     "aiofiles>=23.1.0"
 ]
 
+[project.optional-dependencies]
+aiodbm = [
+    "aiodbm>=0.1.0a1",
+]
+
 [project.urls]
 Documentation = "https://aiodiskqueue.readthedocs.io/en/latest/"
 Source = "https://github.com/ErikKalkoken/aiodiskqueue"
