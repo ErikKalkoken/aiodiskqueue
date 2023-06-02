@@ -16,6 +16,7 @@ This library provides a persistent FIFO queue for Python AsyncIO:
 - Sane logging
 - Type hints
 - Fully tested
+- Supports different storage engines
 
 Usage
 -----
@@ -45,6 +46,16 @@ You can install this library directly from PyPI with the following command:
 .. code:: shell
 
     pip install aiodiskqueue
+
+storage Engines
+---------------
+
+Support different storage engines. The default engine is `DbmEngine`.
+
+- `DbmEngine`: Stores the queue in a DBM database. Consistent throughput even at higher volumes and much faster then Sqlite
+- `SqliteEngine`: Stores the queue in a SQlite database. Consistent throughput even at higher volumes and also process safe
+- `PickledList`: Stores the queue in a pickled list. Very fast at smaller volumes, but does not scale well
+- `PickleSequence`: Stores the queue in a list of pickled items. Very fast for putting and at smaller volumes, does not scale well
 
 
 

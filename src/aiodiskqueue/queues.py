@@ -199,7 +199,7 @@ class Queue(metaclass=NoDirectInstantiation):
                 If it is an integer greater than 0, then put() blocks
                 when the queue reaches maxsize until an item is removed by get().
             cls_storage_engine: Define the storage engine to be used.
-                Default is :class:`.PickleSequence`.
+                Default is :class:`.DbmEngine`.
         """
         data_path = Path(data_path)
         if data_path.suffix == ".bak":
