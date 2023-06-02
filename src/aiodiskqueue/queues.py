@@ -5,7 +5,8 @@ import logging
 from pathlib import Path
 from typing import Any, Union
 
-from aiodiskqueue.engines.simple import PickledList, _FifoStorageEngine
+from aiodiskqueue.engines.base import _FifoStorageEngine
+from aiodiskqueue.engines.dbm import DbmEngine
 from aiodiskqueue.exceptions import QueueEmpty, QueueFull
 from aiodiskqueue.utils import NoDirectInstantiation
 
@@ -205,7 +206,7 @@ class Queue(metaclass=NoDirectInstantiation):
             raise ValueError("Invalid file name: .bak suffix is reserved for backups")
 
         if not cls_storage_engine:
-            cls_storage_engine = PickledList
+            cls_storage_engine = DbmEngine
         else:
             if not issubclass(cls_storage_engine, _FifoStorageEngine):
                 raise TypeError("Invalid storage engine")

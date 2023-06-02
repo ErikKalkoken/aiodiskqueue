@@ -1,10 +1,9 @@
 """Queue storage engines."""
 # flake8: noqa
-
-from .simple import PickledList, PickleSequence
+from .dbm import DbmEngine
 
 try:
-    from .dbm import DbmEngine
+    from .simple import PickledList, PickleSequence
 except ImportError:
     pass
 
