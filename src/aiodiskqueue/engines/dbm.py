@@ -90,17 +90,13 @@ if has_aiodbm:
             return f"item-{item_id}"
 
         @staticmethod
-        async def _get_obj(
-            db: aiodbm.DbmDatabaseAsync, key: Union[str, bytes]
-        ) -> Optional[Any]:
+        async def _get_obj(db, key: Union[str, bytes]) -> Optional[Any]:
             data = await db.get(key)
             if not data:
                 return None
             return pickle.loads(data)
 
         @staticmethod
-        async def _set_obj(
-            db: aiodbm.DbmDatabaseAsync, key: Union[str, bytes], item: Any
-        ):
+        async def _set_obj(db, key: Union[str, bytes], item: Any):
             data = pickle.dumps(item)
             await db.set(key, data)

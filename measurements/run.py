@@ -23,6 +23,8 @@ logging.basicConfig(level="INFO", format="%(asctime)s | %(levelname)s | %(messag
 
 logger = logging.getLogger(__name__)
 
+ITEM_SIZE = 256
+
 
 @dataclass(frozen=True)
 class Measurement:
@@ -113,7 +115,7 @@ async def runner(
     result_queue = asyncio.Queue()
 
     # create source queue with items
-    source_items = {random_string(16) for _ in range(items_count)}
+    source_items = {random_string(ITEM_SIZE) for _ in range(items_count)}
 
     if producer_count:
         for item in source_items:
@@ -184,27 +186,24 @@ async def runner(
 async def start(
     data_path: Path,
     config: dict,
-    profile_name_override=None,
+    profiles: list,
     max_items=None,
 ):
     timestamp = dt.datetime.now(tz=dt.timezone.utc)
 
-    # select profile if override set
-    if profile_name_override:
-        profiles = [
-            obj for obj in config["profiles"] if obj["name"] == profile_name_override
+    # select item count if override set
+    if max_items:
+        item_counts = [
+            count for count in config["common"]["items"] if count <= max_items
         ]
     else:
-        profiles = config["profiles"]
-
-    # select item count if override set
-    item_counts = [count for count in config["common"]["items"] if count <= max_items]
+        item_counts = config["common"]["items"]
 
     for cls_storage_engine in [
         aiodiskqueue.engines.PickledList,
         aiodiskqueue.engines.PickleSequence,
         aiodiskqueue.engines.DbmEngine,
-        aiodiskqueue.engines.SqliteEngine,
+        # aiodiskqueue.engines.SqliteEngine,
     ]:
         for profile in profiles:
             for item_count in item_counts:
@@ -230,7 +229,7 @@ def main():
     profiles = sorted([obj["name"] for obj in config["profiles"]])
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--profile", choices=profiles, help="Only run the given profile"
+        "profiles", choices=profiles, nargs="*", help="Name of the profiles to run"
     )
     parser.add_argument(
         "--max-items",
@@ -238,11 +237,20 @@ def main():
         choices=config["common"]["items"],
         help="Max items to run with from the profile",
     )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Run all profiles",
+    )
     args = parser.parse_args()
 
+    if args.profiles:
+        chosen_profiles = [o for o in config["profiles"] if o["name"] in args.profiles]
+    else:
+        chosen_profiles = config["profiles"]
     with tempfile.TemporaryDirectory() as temp_dir:
         data_path = Path(temp_dir) / "loadtest_queue.dat"
-        asyncio.run(start(data_path, config, args.profile, args.max_items))
+        asyncio.run(start(data_path, config, chosen_profiles, args.max_items))
 
 
 if __name__ == "__main__":

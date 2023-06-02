@@ -24,7 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 aiodbm = [
-    "aiodbm>=0.1.0a1",
+    "aiodbm>=0.2.0a1",
 ]
 
 [project.urls]

@@ -1,13 +1,14 @@
 """Queue storage engines."""
+# flake8: noqa
 
-from .simple import PickledList, PickleSequence  # noqa: F401
+from .simple import PickledList, PickleSequence
 
 try:
-    from .dbm import DbmEngine  # noqa: F401
+    from .dbm import DbmEngine
 except ImportError:
     pass
 
 try:
-    from .sqlite import SqliteEngine  # noqa: F401
+    from .sqlite import SqliteEngine
 except ImportError:
     pass
