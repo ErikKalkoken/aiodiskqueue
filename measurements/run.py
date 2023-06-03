@@ -199,12 +199,12 @@ async def start(
     else:
         item_counts = config["common"]["items"]
 
-    for cls_storage_engine in [
-        aiodiskqueue.engines.PickledList,
-        aiodiskqueue.engines.PickleSequence,
-        aiodiskqueue.engines.DbmEngine,
-        # aiodiskqueue.engines.SqliteEngine,
-    ]:
+    engines = [
+        getattr(aiodiskqueue.engines, engine_name)
+        for engine_name in config["common"]["engines"]
+    ]
+
+    for cls_storage_engine in engines:
         for profile in profiles:
             for item_count in item_counts:
                 await runner(

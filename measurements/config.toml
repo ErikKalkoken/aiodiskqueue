@@ -1,5 +1,6 @@
 [common]
-items = [100, 1000, 5000, 10000, 15000, 20000]
+items = [1000, 5000, 10000, 20000]
+engines = ["PickledList", "DbmEngine", "SqliteEngine"]
 
 [[profiles]]
 name = "minimal"

@@ -50,15 +50,19 @@ You can install this library directly from PyPI with the following command:
 storage Engines
 ---------------
 
-Support different storage engines. The default engine is `DbmEngine`.
+aiodiskqueue support different storage engines. The default engine is `DbmEngine`.
 
-- `DbmEngine`: Stores the queue in a DBM database. Consistent throughput even at higher volumes and much faster then Sqlite
-- `SqliteEngine`: Stores the queue in a SQlite database. Consistent throughput even at higher volumes and also process safe
-- `PickledList`: Stores the queue in a pickled list. Very fast at smaller volumes, but does not scale well
-- `PickleSequence`: Stores the queue in a list of pickled items. Very fast for putting and at smaller volumes, does not scale well
+We measured the throughput for a typical load scenario (5 producers, 1 consumer) with each storage engine:
 
+|chart|
 
+- `DbmEngine`: Consistent throughput at low and high volumes and about 3 x faster then Sqlite
+- `PickledList`: Very fast at low volumes, but does not scale well
+- `SqliteEngine`: Consistent throughput at low and high volumes. Relatively slow.
 
+The scripts for running the measurements and generating this chart can be found in the measurements folder.
+
+.. |chart| image:: https://imgpile.com/images/9luzXk.png
 .. |release| image:: https://img.shields.io/pypi/v/aiodiskqueue?label=release
    :target: https://pypi.org/project/aiodiskqueue/
 .. |python| image:: https://img.shields.io/pypi/pyversions/aiodiskqueue
