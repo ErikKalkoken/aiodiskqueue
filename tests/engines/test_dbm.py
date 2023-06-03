@@ -17,7 +17,7 @@ class TestDbmEngine(TestStorageEngine, QueueAsyncioTestCase):
         await self.engine.initialize()
         # when/then
         with self.assertRaises(ValueError):
-            await self.engine.remove_item([])
+            await self.engine.remove_item()
 
     async def test_can_initialize(self):
         pass  # disable test for now

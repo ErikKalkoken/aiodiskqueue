@@ -38,10 +38,14 @@ class PickledList(_FifoStorageEngine):
 
         return queue
 
-    async def add_item(self, item: Any, items: List[Any]):
+    async def add_item(self, item: Any):
+        items = await self.fetch_all()
+        items.append(item)
         await self._save_all_items(items)
 
-    async def remove_item(self, items: List[Any]):
+    async def remove_item(self):
+        items = await self.fetch_all()
+        items.pop(0)
         await self._save_all_items(items)
 
     async def _save_all_items(self, items: List[Any]):
@@ -83,11 +87,13 @@ class PickleSequence(_FifoStorageEngine):
                     items.append(item)
         return items
 
-    async def add_item(self, item: Any, items: List[Any]):
+    async def add_item(self, item: Any):
         async with aiofiles.open(self._data_path, "ab", buffering=0) as file:
             await file.write(pickle.dumps(item))
 
-    async def remove_item(self, items: List[Any]):
+    async def remove_item(self):
+        items = await self.fetch_all()
+        items.pop(0)
         await self._save_all_items(items)
 
     async def _save_all_items(self, items: List[Any]):

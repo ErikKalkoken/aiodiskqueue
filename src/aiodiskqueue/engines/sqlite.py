@@ -51,7 +51,7 @@ if has_aiosqlite:
 
             return items
 
-        async def add_item(self, item: Any, items: List[Any]):
+        async def add_item(self, item: Any):
             data = pickle.dumps(item)
             async with aiosqlite.connect(self._data_path, isolation_level=None) as db:
                 await db.execute(
@@ -61,7 +61,7 @@ if has_aiosqlite:
                     (data,),
                 )
 
-        async def remove_item(self, items: List[Any]):
+        async def remove_item(self):
             async with aiosqlite.connect(self._data_path, isolation_level=None) as db:
                 await db.execute(
                     """

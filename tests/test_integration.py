@@ -89,7 +89,7 @@ class TestIntegration(QueueAsyncioTestCase):
         self.assertSetEqual(source_items, result_items)
 
     @skipIf(not hasattr(aiodiskqueue.engines, "PickledList"), "aiofiles not installed")
-    async def test_with_dbm_engine(self):
+    async def test_with_pickled_list_engine(self):
         source_items, result_items = await run_test(
             self.data_path, aiodiskqueue.engines.PickledList
         )

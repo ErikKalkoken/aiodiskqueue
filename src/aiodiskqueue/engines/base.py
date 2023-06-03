@@ -23,7 +23,7 @@ class _FifoStorageEngine(ABC):
         """Return all items in data file."""
 
     @abstractmethod
-    async def add_item(self, item: Any, items: List[Any]):
+    async def add_item(self, item: Any):
         """Append one item to end of data file.
 
         Args:
@@ -32,7 +32,7 @@ class _FifoStorageEngine(ABC):
         """
 
     @abstractmethod
-    async def remove_item(self, items: List[Any]):
+    async def remove_item(self):
         """Remove item from start of data file.
 
         Args:

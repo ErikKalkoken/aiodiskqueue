@@ -52,7 +52,7 @@ if has_aiodbm:
 
             return items
 
-        async def add_item(self, item: Any, items: List[Any]):
+        async def add_item(self, item: Any):
             async with aiodbm.open(self._data_path_2, "w") as db:
                 tail_id = await self._get_obj(db, self.TAIL_ID_KEY)
                 if tail_id:
@@ -68,7 +68,7 @@ if has_aiodbm:
                 if is_first:
                     await self._set_obj(db, self.HEAD_ID_KEY, item_id)
 
-        async def remove_item(self, items: List[Any]):
+        async def remove_item(self):
             async with aiodbm.open(self._data_path_2, "w") as db:
                 head_id = await self._get_obj(db, self.HEAD_ID_KEY)
                 tail_id = await self._get_obj(db, self.TAIL_ID_KEY)

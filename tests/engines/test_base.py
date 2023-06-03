@@ -14,7 +14,7 @@ class TestStorageEngine:
         # given
         await self.engine.initialize()
         # when
-        await self.engine.add_item("alpha", ["alpha"])
+        await self.engine.add_item("alpha")
         # then
         items = await self.engine.fetch_all()
         self.assertListEqual(items, ["alpha"])
@@ -23,9 +23,9 @@ class TestStorageEngine:
         # given
         await self.engine.initialize()
         # when
-        await self.engine.add_item("alpha", ["alpha"])
-        await self.engine.add_item("bravo", ["alpha", "bravo"])
-        await self.engine.add_item("charlie", ["alpha", "bravo", "charlie"])
+        await self.engine.add_item("alpha")
+        await self.engine.add_item("bravo")
+        await self.engine.add_item("charlie")
         # then
         items = await self.engine.fetch_all()
         self.assertListEqual(items, ["alpha", "bravo", "charlie"])
@@ -34,8 +34,8 @@ class TestStorageEngine:
         # given
         await self.engine.initialize()
         # when
-        await self.engine.add_item("alpha", [])
-        await self.engine.remove_item([])
+        await self.engine.add_item("alpha")
+        await self.engine.remove_item()
         # then
         items = await self.engine.fetch_all()
         self.assertListEqual(items, [])
@@ -44,9 +44,9 @@ class TestStorageEngine:
         # given
         await self.engine.initialize()
         # when
-        await self.engine.add_item("alpha", ["alpha"])
-        await self.engine.add_item("bravo", ["alpha", "bravo"])
-        await self.engine.remove_item(["bravo"])
+        await self.engine.add_item("alpha")
+        await self.engine.add_item("bravo")
+        await self.engine.remove_item()
         # then
         items = await self.engine.fetch_all()
         self.assertListEqual(items, ["bravo"])
