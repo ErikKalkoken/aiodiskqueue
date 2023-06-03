@@ -15,7 +15,7 @@ else:
 
 from .base import _FifoStorageEngine
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("aiodiskqueue")
 
 if has_aiodbm:
 

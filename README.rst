@@ -47,7 +47,13 @@ You can install this library directly from PyPI with the following command:
 
     pip install aiodiskqueue
 
-storage Engines
+
+Logging
+-------
+
+The name of the logger for all logging by this library is: ``aiodiskqueue``.
+
+Storage Engines
 ---------------
 
 aiodiskqueue support different storage engines. The default engine is `DbmEngine`.

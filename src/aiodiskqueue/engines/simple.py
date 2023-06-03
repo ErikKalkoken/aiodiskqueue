@@ -10,7 +10,7 @@ import aiofiles.os
 
 from .base import _FifoStorageEngine
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("aiodiskqueue")
 
 
 class PickledList(_FifoStorageEngine):

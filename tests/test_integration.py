@@ -7,7 +7,7 @@ import aiodiskqueue
 from .factories import ItemFactory
 from .helpers import QueueAsyncioTestCase
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("aiodiskqueue")
 
 
 async def producer(

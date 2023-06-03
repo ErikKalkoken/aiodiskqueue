@@ -10,7 +10,7 @@ from aiodiskqueue.engines.dbm import DbmEngine
 from aiodiskqueue.exceptions import QueueEmpty, QueueFull
 from aiodiskqueue.utils import NoDirectInstantiation
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("aiodiskqueue")
 
 
 class Queue(metaclass=NoDirectInstantiation):

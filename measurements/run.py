@@ -21,7 +21,7 @@ import aiodiskqueue
 
 logging.basicConfig(level="INFO", format="%(asctime)s | %(levelname)s | %(message)s")
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("aiodiskqueue")
 
 ITEM_SIZE = 256
 
