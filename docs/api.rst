@@ -4,6 +4,7 @@
 API Reference
 ===============
 
+Complete reference of the public API.
 
 Queues
 ======
@@ -14,8 +15,3 @@ Exceptions
 ==========
 
 .. automodule:: aiodiskqueue.exceptions
-
-Storage Engines
-===============
-
-.. automodule:: aiodiskqueue.engines

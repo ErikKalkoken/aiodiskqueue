@@ -1,4 +1,4 @@
-"""Engines for storing the queues on disk."""
+"""Base class for storage engines."""
 
 import logging
 from abc import ABC, abstractmethod
@@ -8,7 +8,7 @@ from typing import Any, List
 logger = logging.getLogger("aiodiskqueue")
 
 
-class _FifoStorageEngine(ABC):
+class FifoStorageEngine(ABC):
     """Base class for all storage engines implementing a FIFO queue."""
 
     def __init__(self, data_path: Path) -> None:
@@ -16,11 +16,17 @@ class _FifoStorageEngine(ABC):
 
     @abstractmethod
     async def initialize(self) -> List[Any]:
-        """Initialize data file."""
+        """Initialize data file.
+
+        :meta private:
+        """
 
     @abstractmethod
     async def fetch_all(self) -> List[Any]:
-        """Return all items in data file."""
+        """Return all items in data file.
+
+        :meta private:
+        """
 
     @abstractmethod
     async def add_item(self, item: Any):
@@ -29,6 +35,8 @@ class _FifoStorageEngine(ABC):
         Args:
             item: Item to be appended
             items: All items including the one to be appended
+
+        :meta private:
         """
 
     @abstractmethod
@@ -38,4 +46,6 @@ class _FifoStorageEngine(ABC):
         Args:
             item: Item to be removed
             items: All items not including the one to be removed
+
+        :meta private:
         """
