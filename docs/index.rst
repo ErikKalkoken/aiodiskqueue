@@ -7,10 +7,17 @@
 
 .. toctree::
     :hidden:
+    :maxdepth: 4
+
+    api
+    extensions
+
+
+Contens
+-------
+
+.. toctree::
     :maxdepth: 2
 
     api
-
-.. toctree::
-    :hidden:
-    :maxdepth: 1
+    extensions

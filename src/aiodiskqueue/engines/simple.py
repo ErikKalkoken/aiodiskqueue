@@ -1,4 +1,4 @@
-"""Engines for storing the queues on disk."""
+"""Engines for storing the queues in flat files."""
 
 import io
 import logging
@@ -8,12 +8,12 @@ from typing import Any, List
 import aiofiles
 import aiofiles.os
 
-from .base import _FifoStorageEngine
+from .base import FifoStorageEngine
 
 logger = logging.getLogger("aiodiskqueue")
 
 
-class PickledList(_FifoStorageEngine):
+class PickledList(FifoStorageEngine):
     """This engine stores items as one singular pickled list of items."""
 
     async def initialize(self):
@@ -54,7 +54,7 @@ class PickledList(_FifoStorageEngine):
         logger.debug("Wrote queue with %d items: %s", len(items), self._data_path)
 
 
-class PickleSequence(_FifoStorageEngine):
+class PickleSequence(FifoStorageEngine):
     """This engine stores items as a sequence of single pickles."""
 
     async def initialize(self):

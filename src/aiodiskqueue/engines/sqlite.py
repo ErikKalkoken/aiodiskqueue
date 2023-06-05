@@ -12,13 +12,13 @@ except ImportError:
 else:
     has_aiosqlite = True
 
-from .base import _FifoStorageEngine
+from .base import FifoStorageEngine
 
 logger = logging.getLogger("aiodiskqueue")
 
 if has_aiosqlite:
 
-    class SqliteEngine(_FifoStorageEngine):
+    class SqliteEngine(FifoStorageEngine):
         """A queue storage engine using Sqlite."""
 
         async def initialize(self):
