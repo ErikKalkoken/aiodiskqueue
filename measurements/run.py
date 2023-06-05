@@ -184,10 +184,7 @@ async def runner(
 
 
 async def start(
-    data_path: Path,
-    config: dict,
-    profiles: list,
-    max_items=None,
+    data_path: Path, config: dict, profiles: list, max_items=None, selected_engine=None
 ):
     timestamp = dt.datetime.now(tz=dt.timezone.utc)
 
@@ -199,11 +196,13 @@ async def start(
     else:
         item_counts = config["common"]["items"]
 
-    engines = [
-        getattr(aiodiskqueue.engines, engine_name)
-        for engine_name in config["common"]["engines"]
-    ]
-
+    if selected_engine:
+        engines = [getattr(aiodiskqueue.engines, selected_engine)]
+    else:
+        engines = [
+            getattr(aiodiskqueue.engines, engine_name)
+            for engine_name in config["common"]["engines"]
+        ]
     for cls_storage_engine in engines:
         for profile in profiles:
             for item_count in item_counts:
@@ -238,6 +237,11 @@ def main():
         help="Max items to run with from the profile",
     )
     parser.add_argument(
+        "--engine",
+        choices=config["common"]["engines"],
+        help="Run with given engine only, default is to run with all configured engines",
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
         help="Run all profiles",
@@ -250,7 +254,9 @@ def main():
         chosen_profiles = config["profiles"]
     with tempfile.TemporaryDirectory() as temp_dir:
         data_path = Path(temp_dir) / "loadtest_queue.dat"
-        asyncio.run(start(data_path, config, chosen_profiles, args.max_items))
+        asyncio.run(
+            start(data_path, config, chosen_profiles, args.max_items, args.engine)
+        )
 
 
 if __name__ == "__main__":
