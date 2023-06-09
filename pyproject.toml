@@ -19,7 +19,7 @@ classifiers = [
 dynamic = ["version", "description"]
 requires-python = ">=3.8"
 dependencies = [
-    "aiodbm>=0.2.0a1",
+    "aiodbm>=0.4.0",
 
 ]
 

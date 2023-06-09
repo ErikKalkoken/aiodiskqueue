@@ -11,13 +11,3 @@
 
     api
     extensions
-
-
-Contens
--------
-
-.. toctree::
-    :maxdepth: 2
-
-    api
-    extensions

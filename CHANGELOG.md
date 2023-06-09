@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
+## [0.1.1] - 2023-06-09
+
+### Changed
+
+- Added engine selection to measurements
+
+### Fixed
+
+- Sidebar shows TOC twice
+
 ## [0.1.0] - 2023-06-05
 
 ### Added
