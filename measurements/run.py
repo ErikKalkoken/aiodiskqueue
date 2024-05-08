@@ -2,6 +2,7 @@
 
 Runs multiple producers and consumers in parallel and measures duration and throughput.
 """
+
 import argparse
 import asyncio
 import csv

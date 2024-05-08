@@ -66,7 +66,11 @@ if has_aiosqlite:
                 await db.execute(
                     """
                         DELETE FROM queue
-                        ORDER BY rowid
-                        LIMIT 1;
+                        WHERE rowid IN (
+                            SELECT rowid
+                            FROM queue
+                            ORDER BY rowid
+                            LIMIT 1
+                        );
                     """
                 )
