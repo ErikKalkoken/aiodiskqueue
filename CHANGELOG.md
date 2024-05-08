@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
+## [0.1.2] - 2024-05-08
+
+### Changed
+
+- Refactored SQL in remove_item() of sqlite engine to address potential compatibility issue (#5)
+
 ## [0.1.1] - 2023-06-09
 
 ### Changed
